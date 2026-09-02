@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Conversation
+from .models import Conversation, Message
 
 
 class ConversationSerializer(serializers.ModelSerializer):
@@ -17,3 +17,28 @@ class ConversationSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
+
+
+class MessageSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Message
+        fields = [
+            "id",
+            "conversation",
+            "role",
+            "content",
+            "created_at",
+        ]
+        read_only_fields = [
+            "id",
+            "conversation",
+            "created_at",
+        ]
+
+    def validate_content(self, value):
+        if not value.strip():
+            raise serializers.ValidationError(
+                "Message content cannot be empty."
+            )
+
+        return value
