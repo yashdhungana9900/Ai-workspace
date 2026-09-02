@@ -32,6 +32,7 @@ class MessageSerializer(serializers.ModelSerializer):
         read_only_fields = [
             "id",
             "conversation",
+            "role",
             "created_at",
         ]
 
