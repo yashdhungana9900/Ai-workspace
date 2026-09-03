@@ -1,15 +1,22 @@
 const API_BASE_URL = "http://127.0.0.1:8000/api/v1";
 
-async function request(endpoint, options = {}) {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    ...options,
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
-  });
 
-  const data = await response.json().catch(() => null);
+async function request(endpoint, options = {}) {
+  const response = await fetch(
+    `${API_BASE_URL}${endpoint}`,
+    {
+      ...options,
+
+      headers: {
+        "Content-Type": "application/json",
+        ...(options.headers || {}),
+      },
+    }
+  );
+
+  const data = await response
+    .json()
+    .catch(() => null);
 
   if (!response.ok) {
     const error = new Error(
@@ -27,15 +34,21 @@ async function request(endpoint, options = {}) {
   return data;
 }
 
-export async function login(username, password) {
+
+export async function login(
+  username,
+  password
+) {
   return request("/auth/login/", {
     method: "POST",
+
     body: JSON.stringify({
       username,
       password,
     }),
   });
 }
+
 
 export async function register({
   username,
@@ -46,6 +59,7 @@ export async function register({
 }) {
   return request("/auth/register/", {
     method: "POST",
+
     body: JSON.stringify({
       username,
       email,
@@ -56,7 +70,10 @@ export async function register({
   });
 }
 
-export async function getCurrentUser(accessToken) {
+
+export async function getCurrentUser(
+  accessToken
+) {
   return request("/auth/me/", {
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -64,7 +81,10 @@ export async function getCurrentUser(accessToken) {
   });
 }
 
-export async function getConversations(accessToken) {
+
+export async function getConversations(
+  accessToken
+) {
   return request("/conversations/", {
     headers: {
       Authorization: `Bearer ${accessToken}`,
@@ -72,20 +92,24 @@ export async function getConversations(accessToken) {
   });
 }
 
+
 export async function createConversation(
   accessToken,
   title = "New conversation"
 ) {
   return request("/conversations/", {
     method: "POST",
+
     headers: {
       Authorization: `Bearer ${accessToken}`,
     },
+
     body: JSON.stringify({
       title,
     }),
   });
 }
+
 
 export async function getConversationMessages(
   accessToken,
@@ -101,6 +125,7 @@ export async function getConversationMessages(
   );
 }
 
+
 export async function sendMessage(
   accessToken,
   conversationId,
@@ -110,15 +135,18 @@ export async function sendMessage(
     `/conversations/${conversationId}/messages/`,
     {
       method: "POST",
+
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },
+
       body: JSON.stringify({
         content,
       }),
     }
   );
 }
+
 
 export async function streamMessage(
   accessToken,
@@ -130,10 +158,12 @@ export async function streamMessage(
     `${API_BASE_URL}/conversations/${conversationId}/messages/`,
     {
       method: "POST",
+
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${accessToken}`,
       },
+
       body: JSON.stringify({
         content,
       }),
@@ -141,7 +171,9 @@ export async function streamMessage(
   );
 
   if (!response.ok) {
-    const data = await response.json().catch(() => null);
+    const data = await response
+      .json()
+      .catch(() => null);
 
     const error = new Error(
       data?.detail ||
@@ -162,24 +194,34 @@ export async function streamMessage(
   }
 
   const reader = response.body.getReader();
+
   const decoder = new TextDecoder();
 
   let buffer = "";
 
   while (true) {
-    const { value, done } = await reader.read();
+    const {
+      value,
+      done,
+    } = await reader.read();
 
     if (done) {
       break;
     }
 
-    buffer += decoder.decode(value, {
-      stream: true,
-    });
+    buffer += decoder.decode(
+      value,
+      {
+        stream: true,
+      }
+    );
 
-    const events = buffer.split("\n\n");
+    const events = buffer.split(
+      "\n\n"
+    );
 
-    buffer = events.pop() || "";
+    buffer =
+      events.pop() || "";
 
     for (const eventBlock of events) {
       if (!eventBlock.trim()) {
@@ -187,9 +229,12 @@ export async function streamMessage(
       }
 
       let eventType = "message";
+
       let dataLine = "";
 
-      for (const line of eventBlock.split("\n")) {
+      for (
+        const line of eventBlock.split("\n")
+      ) {
         if (line.startsWith("event:")) {
           eventType = line
             .slice("event:".length)
@@ -220,7 +265,9 @@ export async function streamMessage(
       }
 
       if (eventType === "delta") {
-        callbacks?.onDelta?.(data.content || "");
+        callbacks?.onDelta?.(
+          data.content || ""
+        );
       }
 
       if (eventType === "done") {
@@ -234,6 +281,29 @@ export async function streamMessage(
   }
 }
 
+
+export async function renameConversation(
+  accessToken,
+  conversationId,
+  title
+) {
+  return request(
+    `/conversations/${conversationId}/`,
+    {
+      method: "PATCH",
+
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+
+      body: JSON.stringify({
+        title,
+      }),
+    }
+  );
+}
+
+
 export async function deleteConversation(
   accessToken,
   conversationId
@@ -242,6 +312,7 @@ export async function deleteConversation(
     `/conversations/${conversationId}/`,
     {
       method: "DELETE",
+
       headers: {
         Authorization: `Bearer ${accessToken}`,
       },

@@ -24,7 +24,9 @@ class ConversationListCreateView(generics.ListCreateAPIView):
         serializer.save(user=self.request.user)
 
 
-class ConversationDetailView(generics.RetrieveDestroyAPIView):
+class ConversationDetailView(
+    generics.RetrieveUpdateDestroyAPIView
+):
     serializer_class = ConversationSerializer
     permission_classes = [IsAuthenticated]
 
@@ -59,7 +61,7 @@ class MessageListCreateView(generics.ListCreateAPIView):
             role=Message.Role.USER,
         )
 
-        # Generate a useful title from the first user message.
+        # Generate a title from the first user message.
         if conversation.title == "New conversation":
             conversation.title = self.generate_title(
                 user_message.content
@@ -161,7 +163,6 @@ class MessageListCreateView(generics.ListCreateAPIView):
         if not title:
             return "New conversation"
 
-        # Keep titles compact in the sidebar.
         max_length = 50
 
         if len(title) <= max_length:

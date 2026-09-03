@@ -5,54 +5,84 @@ import ChatWorkspace from "./components/chat/ChatWorkspace";
 
 import {
   createConversation,
+  deleteConversation,
   getConversationMessages,
   getConversations,
   getCurrentUser,
   login,
+  renameConversation,
   streamMessage,
 } from "./api";
 
 import "./App.css";
 
-const TOKEN_KEY = "ai_workspace_access_token";
 
-function LoginScreen({ onLogin, loading, error }) {
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
+const TOKEN_KEY =
+  "ai_workspace_access_token";
 
-  const handleSubmit = async (event) => {
+
+function LoginScreen({
+  onLogin,
+  loading,
+  error,
+}) {
+  const [username, setUsername] =
+    useState("");
+
+  const [password, setPassword] =
+    useState("");
+
+
+  const handleSubmit = async (
+    event
+  ) => {
     event.preventDefault();
 
-    if (!username.trim() || !password) {
+    if (
+      !username.trim() ||
+      !password
+    ) {
       return;
     }
 
-    await onLogin(username, password);
+    await onLogin(
+      username,
+      password
+    );
   };
+
 
   return (
     <div className="auth-screen">
       <div className="auth-card">
+
         <div className="auth-brand">
           <div className="auth-brand-mark">
             <span>✦</span>
           </div>
 
-          <span>AI Workspace</span>
+          <span>
+            AI Workspace
+          </span>
         </div>
 
+
         <div className="auth-heading">
-          <h1>Welcome back</h1>
+          <h1>
+            Welcome back
+          </h1>
 
           <p>
             Sign in to continue to your workspace.
           </p>
         </div>
 
+
         <form
           className="auth-form"
           onSubmit={handleSubmit}
         >
+
           <label>
             Username
 
@@ -60,12 +90,15 @@ function LoginScreen({ onLogin, loading, error }) {
               type="text"
               value={username}
               onChange={(event) =>
-                setUsername(event.target.value)
+                setUsername(
+                  event.target.value
+                )
               }
               placeholder="Enter your username"
               autoComplete="username"
             />
           </label>
+
 
           <label>
             Password
@@ -74,12 +107,15 @@ function LoginScreen({ onLogin, loading, error }) {
               type="password"
               value={password}
               onChange={(event) =>
-                setPassword(event.target.value)
+                setPassword(
+                  event.target.value
+                )
               }
               placeholder="Enter your password"
               autoComplete="current-password"
             />
           </label>
+
 
           {error && (
             <div className="auth-error">
@@ -87,41 +123,75 @@ function LoginScreen({ onLogin, loading, error }) {
             </div>
           )}
 
+
           <button
             className="auth-submit"
             type="submit"
             disabled={loading}
           >
-            {loading ? "Signing in..." : "Sign in"}
+            {loading
+              ? "Signing in..."
+              : "Sign in"}
           </button>
+
         </form>
+
 
         <p className="auth-footer">
           AI Workspace · Personal account
         </p>
+
       </div>
     </div>
   );
 }
 
+
 function App() {
-  const [accessToken, setAccessToken] = useState(
-    () => localStorage.getItem(TOKEN_KEY)
-  );
+  const [accessToken, setAccessToken] =
+    useState(
+      () =>
+        localStorage.getItem(
+          TOKEN_KEY
+        )
+    );
 
-  const [user, setUser] = useState(null);
-  const [conversations, setConversations] = useState([]);
-  const [activeConversationId, setActiveConversationId] =
+
+  const [user, setUser] =
     useState(null);
-  const [messages, setMessages] = useState([]);
 
-  const [input, setInput] = useState("");
+  const [
+    conversations,
+    setConversations,
+  ] = useState([]);
 
-  const [loading, setLoading] = useState(true);
-  const [loginLoading, setLoginLoading] = useState(false);
-  const [isSending, setIsSending] = useState(false);
+  const [
+    activeConversationId,
+    setActiveConversationId,
+  ] = useState(null);
 
-  const [error, setError] = useState("");
+  const [messages, setMessages] =
+    useState([]);
+
+  const [input, setInput] =
+    useState("");
+
+  const [loading, setLoading] =
+    useState(true);
+
+  const [
+    loginLoading,
+    setLoginLoading,
+  ] = useState(false);
+
+  const [
+    isSending,
+    setIsSending,
+  ] = useState(false);
+
+  const [error, setError] =
+    useState("");
+
 
   useEffect(() => {
     if (!accessToken) {
@@ -132,27 +202,40 @@ function App() {
     initializeApp();
   }, [accessToken]);
 
+
   async function initializeApp() {
     try {
       setLoading(true);
       setError("");
 
       const currentUser =
-        await getCurrentUser(accessToken);
+        await getCurrentUser(
+          accessToken
+        );
 
       setUser(currentUser);
 
+
       const conversationList =
-        await getConversations(accessToken);
+        await getConversations(
+          accessToken
+        );
 
-      setConversations(conversationList);
+      setConversations(
+        conversationList
+      );
 
-      if (conversationList.length > 0) {
-        const firstConversation = conversationList[0];
+
+      if (
+        conversationList.length > 0
+      ) {
+        const firstConversation =
+          conversationList[0];
 
         setActiveConversationId(
           firstConversation.id
         );
+
 
         const conversationMessages =
           await getConversationMessages(
@@ -160,42 +243,60 @@ function App() {
             firstConversation.id
           );
 
-        setMessages(conversationMessages);
+        setMessages(
+          conversationMessages
+        );
       } else {
-        setActiveConversationId(null);
+        setActiveConversationId(
+          null
+        );
+
         setMessages([]);
       }
+
     } catch (err) {
       console.error(err);
 
-      localStorage.removeItem(TOKEN_KEY);
+      localStorage.removeItem(
+        TOKEN_KEY
+      );
 
       setAccessToken(null);
       setUser(null);
       setConversations([]);
       setActiveConversationId(null);
       setMessages([]);
+
     } finally {
       setLoading(false);
     }
   }
 
-  async function handleLogin(username, password) {
+
+  async function handleLogin(
+    username,
+    password
+  ) {
     try {
       setLoginLoading(true);
       setError("");
 
-      const data = await login(
-        username,
-        password
-      );
+      const data =
+        await login(
+          username,
+          password
+        );
+
 
       localStorage.setItem(
         TOKEN_KEY,
         data.access
       );
 
-      setAccessToken(data.access);
+      setAccessToken(
+        data.access
+      );
+
     } catch (err) {
       console.error(err);
 
@@ -203,13 +304,17 @@ function App() {
         err?.data?.detail ||
           "Invalid username or password."
       );
+
     } finally {
       setLoginLoading(false);
     }
   }
 
+
   function handleLogout() {
-    localStorage.removeItem(TOKEN_KEY);
+    localStorage.removeItem(
+      TOKEN_KEY
+    );
 
     setAccessToken(null);
     setUser(null);
@@ -219,6 +324,7 @@ function App() {
     setInput("");
     setError("");
   }
+
 
   async function handleNewConversation() {
     if (!accessToken) {
@@ -234,10 +340,14 @@ function App() {
           "New conversation"
         );
 
-      setConversations((previous) => [
-        conversation,
-        ...previous,
-      ]);
+
+      setConversations(
+        (previous) => [
+          conversation,
+          ...previous,
+        ]
+      );
+
 
       setActiveConversationId(
         conversation.id
@@ -245,6 +355,7 @@ function App() {
 
       setMessages([]);
       setInput("");
+
     } catch (err) {
       console.error(err);
 
@@ -253,6 +364,7 @@ function App() {
       );
     }
   }
+
 
   async function handleSelectConversation(
     conversationId
@@ -268,13 +380,18 @@ function App() {
         conversationId
       );
 
+
       const conversationMessages =
         await getConversationMessages(
           accessToken,
           conversationId
         );
 
-      setMessages(conversationMessages);
+
+      setMessages(
+        conversationMessages
+      );
+
     } catch (err) {
       console.error(err);
 
@@ -284,8 +401,98 @@ function App() {
     }
   }
 
+
+  async function handleRenameConversation(
+    conversationId,
+    title
+  ) {
+    const cleanTitle =
+      title.trim();
+
+    if (!cleanTitle) {
+      return;
+    }
+
+
+    try {
+      setError("");
+
+      const updatedConversation =
+        await renameConversation(
+          accessToken,
+          conversationId,
+          cleanTitle
+        );
+
+
+      setConversations(
+        (previous) =>
+          previous.map(
+            (conversation) =>
+              conversation.id ===
+              conversationId
+                ? updatedConversation
+                : conversation
+          )
+      );
+
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        "Unable to rename this conversation."
+      );
+    }
+  }
+
+
+  async function handleDeleteConversation(
+    conversationId
+  ) {
+    try {
+      setError("");
+
+      await deleteConversation(
+        accessToken,
+        conversationId
+      );
+
+
+      setConversations(
+        (previous) =>
+          previous.filter(
+            (conversation) =>
+              conversation.id !==
+              conversationId
+          )
+      );
+
+
+      if (
+        activeConversationId ===
+        conversationId
+      ) {
+        setActiveConversationId(
+          null
+        );
+
+        setMessages([]);
+      }
+
+    } catch (err) {
+      console.error(err);
+
+      setError(
+        "Unable to delete this conversation."
+      );
+    }
+  }
+
+
   async function handleSendMessage() {
-    const content = input.trim();
+    const content =
+      input.trim();
+
 
     if (
       !content ||
@@ -296,16 +503,20 @@ function App() {
       return;
     }
 
+
     const conversationId =
       activeConversationId;
 
+
     const streamingMessageId =
       `streaming-${Date.now()}`;
+
 
     try {
       setIsSending(true);
       setError("");
       setInput("");
+
 
       await streamMessage(
         accessToken,
@@ -316,77 +527,109 @@ function App() {
             user_message,
             conversation,
           }) => {
-            setMessages((previous) => [
-              ...previous,
-              user_message,
-              {
-                id: streamingMessageId,
-                conversation:
-                  conversationId,
-                role: "assistant",
-                content: "",
-                created_at:
-                  new Date().toISOString(),
-              },
-            ]);
 
-            // Update the sidebar immediately
-            // with the generated conversation title.
-            setConversations((previous) =>
-              previous.map((item) =>
-                item.id === conversationId
-                  ? {
-                      ...item,
-                      title:
-                        conversation.title,
-                      updated_at:
-                        conversation.updated_at,
-                    }
-                  : item
-              )
+            setMessages(
+              (previous) => [
+                ...previous,
+                user_message,
+                {
+                  id:
+                    streamingMessageId,
+
+                  conversation:
+                    conversationId,
+
+                  role:
+                    "assistant",
+
+                  content:
+                    "",
+
+                  created_at:
+                    new Date().toISOString(),
+                },
+              ]
+            );
+
+
+            setConversations(
+              (previous) =>
+                previous.map(
+                  (item) =>
+                    item.id ===
+                    conversationId
+                      ? {
+                          ...item,
+
+                          title:
+                            conversation.title,
+
+                          updated_at:
+                            conversation.updated_at,
+                        }
+                      : item
+                )
             );
           },
+
 
           onDelta: (delta) => {
-            setMessages((previous) =>
-              previous.map((message) =>
-                message.id ===
-                streamingMessageId
-                  ? {
-                      ...message,
-                      content:
-                        message.content + delta,
-                    }
-                  : message
-              )
+            setMessages(
+              (previous) =>
+                previous.map(
+                  (message) =>
+                    message.id ===
+                    streamingMessageId
+                      ? {
+                          ...message,
+
+                          content:
+                            message.content +
+                            delta,
+                        }
+                      : message
+                )
             );
           },
 
-          onDone: ({ assistant_message }) => {
-            setMessages((previous) =>
-              previous.map((message) =>
-                message.id ===
-                streamingMessageId
-                  ? assistant_message
-                  : message
-              )
+
+          onDone: ({
+            assistant_message,
+          }) => {
+
+            setMessages(
+              (previous) =>
+                previous.map(
+                  (message) =>
+                    message.id ===
+                    streamingMessageId
+                      ? assistant_message
+                      : message
+                )
             );
 
-            setConversations((previous) =>
-              previous.map((conversation) =>
-                conversation.id ===
-                conversationId
-                  ? {
-                      ...conversation,
-                      updated_at:
-                        assistant_message.created_at,
-                    }
-                  : conversation
-              )
+
+            setConversations(
+              (previous) =>
+                previous.map(
+                  (conversation) =>
+                    conversation.id ===
+                    conversationId
+                      ? {
+                          ...conversation,
+
+                          updated_at:
+                            assistant_message.created_at,
+                        }
+                      : conversation
+                )
             );
           },
 
-          onError: ({ message }) => {
+
+          onError: ({
+            message,
+          }) => {
             setError(
               message ||
                 "The AI service is currently unavailable."
@@ -394,6 +637,7 @@ function App() {
           },
         }
       );
+
     } catch (err) {
       console.error(err);
 
@@ -403,10 +647,12 @@ function App() {
       );
 
       setInput(content);
+
     } finally {
       setIsSending(false);
     }
   }
+
 
   if (loading) {
     return (
@@ -415,12 +661,18 @@ function App() {
           <span>✦</span>
         </div>
 
-        <span>Loading workspace...</span>
+        <span>
+          Loading workspace...
+        </span>
       </div>
     );
   }
 
-  if (!accessToken || !user) {
+
+  if (
+    !accessToken ||
+    !user
+  ) {
     return (
       <LoginScreen
         onLogin={handleLogin}
@@ -430,12 +682,14 @@ function App() {
     );
   }
 
+
   const activeConversation =
     conversations.find(
       (conversation) =>
         conversation.id ===
         activeConversationId
     );
+
 
   return (
     <>
@@ -444,16 +698,21 @@ function App() {
           {error}
 
           <button
-            onClick={() => setError("")}
+            onClick={() =>
+              setError("")
+            }
           >
             Dismiss
           </button>
         </div>
       )}
 
+
       <ProductShell
         user={user}
-        conversations={conversations}
+        conversations={
+          conversations
+        }
         activeConversationId={
           activeConversationId
         }
@@ -463,22 +722,39 @@ function App() {
         onNewConversation={
           handleNewConversation
         }
-        onLogout={handleLogout}
+        onRenameConversation={
+          handleRenameConversation
+        }
+        onDeleteConversation={
+          handleDeleteConversation
+        }
+        onLogout={
+          handleLogout
+        }
       >
+
         <ChatWorkspace
-          conversation={activeConversation}
+          conversation={
+            activeConversation
+          }
           messages={messages}
           input={input}
           setInput={setInput}
-          onSendMessage={handleSendMessage}
-          isSending={isSending}
+          onSendMessage={
+            handleSendMessage
+          }
+          isSending={
+            isSending
+          }
           onNewConversation={
             handleNewConversation
           }
         />
+
       </ProductShell>
     </>
   );
 }
+
 
 export default App;
