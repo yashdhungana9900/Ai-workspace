@@ -296,6 +296,9 @@ function App() {
       return;
     }
 
+    const conversationId =
+      activeConversationId;
+
     const streamingMessageId =
       `streaming-${Date.now()}`;
 
@@ -306,23 +309,42 @@ function App() {
 
       await streamMessage(
         accessToken,
-        activeConversationId,
+        conversationId,
         content,
         {
-          onStart: ({ user_message }) => {
+          onStart: ({
+            user_message,
+            conversation,
+          }) => {
             setMessages((previous) => [
               ...previous,
               user_message,
               {
                 id: streamingMessageId,
                 conversation:
-                  activeConversationId,
+                  conversationId,
                 role: "assistant",
                 content: "",
                 created_at:
                   new Date().toISOString(),
               },
             ]);
+
+            // Update the sidebar immediately
+            // with the generated conversation title.
+            setConversations((previous) =>
+              previous.map((item) =>
+                item.id === conversationId
+                  ? {
+                      ...item,
+                      title:
+                        conversation.title,
+                      updated_at:
+                        conversation.updated_at,
+                    }
+                  : item
+              )
+            );
           },
 
           onDelta: (delta) => {
@@ -353,7 +375,7 @@ function App() {
             setConversations((previous) =>
               previous.map((conversation) =>
                 conversation.id ===
-                activeConversationId
+                conversationId
                   ? {
                       ...conversation,
                       updated_at:

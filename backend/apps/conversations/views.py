@@ -5,8 +5,6 @@ from django.shortcuts import get_object_or_404
 
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
-from rest_framework.response import Response
-from rest_framework.views import APIView
 
 from .models import Conversation, Message
 from .serializers import ConversationSerializer, MessageSerializer
@@ -61,6 +59,19 @@ class MessageListCreateView(generics.ListCreateAPIView):
             role=Message.Role.USER,
         )
 
+        # Generate a useful title from the first user message.
+        if conversation.title == "New conversation":
+            conversation.title = self.generate_title(
+                user_message.content
+            )
+
+            conversation.save(
+                update_fields=[
+                    "title",
+                    "updated_at",
+                ]
+            )
+
         conversation_history = [
             {
                 "role": message.role,
@@ -73,11 +84,16 @@ class MessageListCreateView(generics.ListCreateAPIView):
             user_message
         ).data
 
+        conversation_data = ConversationSerializer(
+            conversation
+        ).data
+
         def event_stream():
             yield self._sse_event(
                 "start",
                 {
                     "user_message": user_message_data,
+                    "conversation": conversation_data,
                 },
             )
 
@@ -137,6 +153,26 @@ class MessageListCreateView(generics.ListCreateAPIView):
         response["X-Accel-Buffering"] = "no"
 
         return response
+
+    @staticmethod
+    def generate_title(content):
+        title = " ".join(content.strip().split())
+
+        if not title:
+            return "New conversation"
+
+        # Keep titles compact in the sidebar.
+        max_length = 50
+
+        if len(title) <= max_length:
+            return title
+
+        truncated = title[:max_length].rsplit(
+            " ",
+            1,
+        )[0]
+
+        return f"{truncated}..."
 
     @staticmethod
     def _sse_event(event_type, data):
