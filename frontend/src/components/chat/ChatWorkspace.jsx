@@ -8,6 +8,7 @@ import {
   Sparkles,
   SlidersHorizontal,
 } from "lucide-react";
+import { useEffect, useRef } from "react";
 
 function ChatWorkspace({
   conversation,
@@ -18,6 +19,8 @@ function ChatWorkspace({
   isSending,
   onNewConversation,
 }) {
+  const messagesEndRef = useRef(null);
+
   const suggestions = [
     {
       icon: FileText,
@@ -63,14 +66,21 @@ function ChatWorkspace({
     }
   };
 
+  useEffect(() => {
+    if (!messagesEndRef.current) {
+      return;
+    }
+
+    messagesEndRef.current.scrollIntoView({
+      behavior: "smooth",
+      block: "end",
+    });
+  }, [messages]);
+
   const hasMessages = messages.length > 0;
 
   return (
     <section className="chat-workspace">
-      {/* ================================= */}
-      {/* Header */}
-      {/* ================================= */}
-
       <header className="chat-header">
         <div className="chat-header-left">
           <button className="chat-title-button">
@@ -107,17 +117,11 @@ function ChatWorkspace({
 
           <button className="model-selector">
             <span className="model-dot" />
-
             <span>GPT-4o mini</span>
-
             <ChevronDown size={14} />
           </button>
         </div>
       </header>
-
-      {/* ================================= */}
-      {/* Chat Content */}
-      {/* ================================= */}
 
       <div className="chat-content">
         {!hasMessages ? (
@@ -135,61 +139,47 @@ function ChatWorkspace({
               </h1>
 
               <p>
-                Ask a question, analyze a
-                document, write code, or start
-                something new.
+                Ask a question, analyze a document,
+                write code, or start something new.
               </p>
             </div>
 
-            {/* ================================= */}
-            {/* Suggestions */}
-            {/* ================================= */}
-
             <div className="suggestion-grid">
-              {suggestions.map(
-                (suggestion) => {
-                  const Icon =
-                    suggestion.icon;
+              {suggestions.map((suggestion) => {
+                const Icon = suggestion.icon;
 
-                  return (
-                    <button
-                      className="suggestion-card"
-                      key={suggestion.title}
-                      onClick={() =>
-                        setInput(
-                          suggestion.prompt
-                        )
-                      }
-                    >
-                      <div className="suggestion-icon">
-                        <Icon
-                          size={17}
-                          strokeWidth={1.8}
-                        />
-                      </div>
+                return (
+                  <button
+                    className="suggestion-card"
+                    key={suggestion.title}
+                    onClick={() =>
+                      setInput(
+                        suggestion.prompt
+                      )
+                    }
+                  >
+                    <div className="suggestion-icon">
+                      <Icon
+                        size={17}
+                        strokeWidth={1.8}
+                      />
+                    </div>
 
-                      <div className="suggestion-copy">
-                        <span className="suggestion-title">
-                          {suggestion.title}
-                        </span>
+                    <div className="suggestion-copy">
+                      <span className="suggestion-title">
+                        {suggestion.title}
+                      </span>
 
-                        <span className="suggestion-description">
-                          {
-                            suggestion.description
-                          }
-                        </span>
-                      </div>
-                    </button>
-                  );
-                }
-              )}
+                      <span className="suggestion-description">
+                        {suggestion.description}
+                      </span>
+                    </div>
+                  </button>
+                );
+              })}
             </div>
           </div>
         ) : (
-          /* ================================= */
-          /* Messages */
-          /* ================================= */
-
           <div className="message-list">
             {messages.map((message) => {
               const isStreaming =
@@ -234,13 +224,15 @@ function ChatWorkspace({
                 </div>
               );
             })}
+
+            <div
+              ref={messagesEndRef}
+              className="messages-end"
+              aria-hidden="true"
+            />
           </div>
         )}
       </div>
-
-      {/* ================================= */}
-      {/* Composer */}
-      {/* ================================= */}
 
       <div className="composer-area">
         <div className="composer">
