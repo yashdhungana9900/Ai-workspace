@@ -7,10 +7,21 @@ import {
   Plus,
   Sparkles,
   SlidersHorizontal,
+  Upload,
+  X,
 } from "lucide-react";
-import { useEffect, useRef } from "react";
+
+import {
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+
+import { uploadDocument } from "../../api";
+
 
 function ChatWorkspace({
+  accessToken,
   conversation,
   messages,
   input,
@@ -20,6 +31,20 @@ function ChatWorkspace({
   onNewConversation,
 }) {
   const messagesEndRef = useRef(null);
+  const fileInputRef = useRef(null);
+
+  const [selectedFile, setSelectedFile] =
+    useState(null);
+
+  const [isUploading, setIsUploading] =
+    useState(false);
+
+  const [uploadError, setUploadError] =
+    useState("");
+
+  const [uploadSuccess, setUploadSuccess] =
+    useState("");
+
 
   const suggestions = [
     {
@@ -56,15 +81,129 @@ function ChatWorkspace({
     },
   ];
 
+
   const handleKeyDown = (event) => {
-    if (event.key === "Enter" && !event.shiftKey) {
+    if (
+      event.key === "Enter" &&
+      !event.shiftKey
+    ) {
       event.preventDefault();
 
-      if (!isSending && input.trim()) {
+      if (
+        !isSending &&
+        !isUploading &&
+        input.trim()
+      ) {
         onSendMessage();
       }
     }
   };
+
+
+  const handleAttachClick = () => {
+    if (isUploading) {
+      return;
+    }
+
+    setUploadError("");
+    setUploadSuccess("");
+
+    fileInputRef.current?.click();
+  };
+
+
+  const handleFileChange = (event) => {
+    const file =
+      event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    console.log(
+      "File selected:",
+      file.name,
+      file.type,
+      file.size
+    );
+
+    setUploadError("");
+    setUploadSuccess("");
+    setSelectedFile(file);
+  };
+
+
+  const handleUpload = async () => {
+    if (!selectedFile) {
+      return;
+    }
+
+    if (!accessToken) {
+      setUploadError(
+        "You are not authenticated. Please log in again."
+      );
+
+      return;
+    }
+
+    setUploadError("");
+    setUploadSuccess("");
+    setIsUploading(true);
+
+    console.log(
+      "Starting document upload:",
+      selectedFile.name
+    );
+
+    try {
+      const result =
+        await uploadDocument(
+          accessToken,
+          selectedFile
+        );
+
+      console.log(
+        "Document uploaded successfully:",
+        result
+      );
+
+      setUploadSuccess(
+        `${selectedFile.name} uploaded successfully.`
+      );
+
+      setSelectedFile(null);
+
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+
+    } catch (error) {
+      console.error(
+        "Document upload failed:",
+        error
+      );
+
+      setUploadError(
+        error?.message ||
+          "Failed to upload document."
+      );
+
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+
+  const handleCancelUpload = () => {
+    setSelectedFile(null);
+    setUploadError("");
+    setUploadSuccess("");
+
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+  };
+
 
   useEffect(() => {
     if (!messagesEndRef.current) {
@@ -77,13 +216,23 @@ function ChatWorkspace({
     });
   }, [messages]);
 
-  const hasMessages = messages.length > 0;
+
+  const hasMessages =
+    messages.length > 0;
+
 
   return (
     <section className="chat-workspace">
+
       <header className="chat-header">
+
         <div className="chat-header-left">
-          <button className="chat-title-button">
+
+          <button
+            className="chat-title-button"
+            type="button"
+          >
+
             <div className="chat-title-icon">
               <Sparkles
                 size={15}
@@ -92,6 +241,7 @@ function ChatWorkspace({
             </div>
 
             <div className="chat-title-copy">
+
               <span className="chat-title">
                 {conversation?.title ||
                   "New conversation"}
@@ -100,32 +250,52 @@ function ChatWorkspace({
               <span className="chat-subtitle">
                 Personal workspace
               </span>
+
             </div>
 
             <ChevronDown size={15} />
+
           </button>
+
         </div>
 
+
         <div className="chat-header-right">
+
           <button
             className="header-icon-button"
             aria-label="New conversation"
             onClick={onNewConversation}
+            type="button"
           >
             <Plus size={18} />
           </button>
 
-          <button className="model-selector">
+
+          <button
+            className="model-selector"
+            type="button"
+          >
             <span className="model-dot" />
-            <span>GPT-4o mini</span>
+
+            <span>
+              GPT-4o mini
+            </span>
+
             <ChevronDown size={14} />
           </button>
+
         </div>
+
       </header>
 
+
       <div className="chat-content">
+
         {!hasMessages ? (
+
           <div className="chat-empty-state">
+
             <div className="hero-mark">
               <Sparkles
                 size={22}
@@ -133,7 +303,9 @@ function ChatWorkspace({
               />
             </div>
 
+
             <div className="hero-copy">
+
               <h1>
                 What can I help you build?
               </h1>
@@ -142,46 +314,66 @@ function ChatWorkspace({
                 Ask a question, analyze a document,
                 write code, or start something new.
               </p>
+
             </div>
+
 
             <div className="suggestion-grid">
-              {suggestions.map((suggestion) => {
-                const Icon = suggestion.icon;
 
-                return (
-                  <button
-                    className="suggestion-card"
-                    key={suggestion.title}
-                    onClick={() =>
-                      setInput(
-                        suggestion.prompt
-                      )
-                    }
-                  >
-                    <div className="suggestion-icon">
-                      <Icon
-                        size={17}
-                        strokeWidth={1.8}
-                      />
-                    </div>
+              {suggestions.map(
+                (suggestion) => {
+                  const Icon =
+                    suggestion.icon;
 
-                    <div className="suggestion-copy">
-                      <span className="suggestion-title">
-                        {suggestion.title}
-                      </span>
+                  return (
+                    <button
+                      className="suggestion-card"
+                      key={suggestion.title}
+                      onClick={() =>
+                        setInput(
+                          suggestion.prompt
+                        )
+                      }
+                      type="button"
+                    >
 
-                      <span className="suggestion-description">
-                        {suggestion.description}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
+                      <div className="suggestion-icon">
+
+                        <Icon
+                          size={17}
+                          strokeWidth={1.8}
+                        />
+
+                      </div>
+
+
+                      <div className="suggestion-copy">
+
+                        <span className="suggestion-title">
+                          {suggestion.title}
+                        </span>
+
+                        <span className="suggestion-description">
+                          {suggestion.description}
+                        </span>
+
+                      </div>
+
+                    </button>
+                  );
+                }
+              )}
+
             </div>
+
           </div>
+
         ) : (
+
           <div className="message-list">
+
             {messages.map((message) => {
+
               const isStreaming =
                 typeof message.id ===
                   "string" &&
@@ -200,108 +392,256 @@ function ChatWorkspace({
                   }`}
                   key={message.id}
                 >
+
                   <div className="message-avatar">
+
                     {message.role ===
                     "assistant" ? (
                       <Sparkles size={15} />
                     ) : (
                       "Y"
                     )}
+
                   </div>
 
+
                   <div className="message-body">
+
                     <div className="message-author">
+
                       {message.role ===
                       "assistant"
                         ? "AI Workspace"
                         : "You"}
+
                     </div>
+
 
                     <div className="message-content">
                       {message.content}
                     </div>
+
                   </div>
+
                 </div>
               );
             })}
+
 
             <div
               ref={messagesEndRef}
               className="messages-end"
               aria-hidden="true"
             />
+
           </div>
+
         )}
+
       </div>
 
+
       <div className="composer-area">
+
+        {selectedFile && (
+          <div className="upload-preview">
+
+            <div className="upload-preview-info">
+
+              <FileText size={18} />
+
+              <div>
+                <strong>
+                  {selectedFile.name}
+                </strong>
+
+                <span>
+                  {(
+                    selectedFile.size /
+                    1024
+                  ).toFixed(1)} KB
+                </span>
+              </div>
+
+            </div>
+
+
+            {!isUploading && (
+              <button
+                type="button"
+                className="upload-cancel"
+                onClick={
+                  handleCancelUpload
+                }
+                aria-label="Remove selected file"
+              >
+                <X size={16} />
+              </button>
+            )}
+
+          </div>
+        )}
+
+
+        {uploadError && (
+          <div className="upload-error">
+            {uploadError}
+          </div>
+        )}
+
+
+        {uploadSuccess && (
+          <div className="upload-success">
+            {uploadSuccess}
+          </div>
+        )}
+
+
+        {selectedFile && !isUploading && (
+          <button
+            type="button"
+            className="upload-document-button"
+            onClick={handleUpload}
+          >
+            <Upload size={16} />
+
+            Upload document
+          </button>
+        )}
+
+
+        {isUploading && (
+          <div className="upload-status">
+            Uploading document...
+          </div>
+        )}
+
+
         <div className="composer">
+
           <div className="composer-input-row">
+
             <button
               className="composer-icon"
               aria-label="Attach file"
+              onClick={handleAttachClick}
+              disabled={isUploading}
+              type="button"
             >
               <Paperclip size={18} />
             </button>
 
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".pdf,.txt,application/pdf,text/plain"
+              onChange={handleFileChange}
+              style={{
+                display: "none",
+              }}
+            />
+
+
             <textarea
               className="composer-input"
-              placeholder="Message AI Workspace..."
+              placeholder={
+                isUploading
+                  ? "Uploading document..."
+                  : "Message AI Workspace..."
+              }
               value={input}
               onChange={(event) =>
-                setInput(event.target.value)
+                setInput(
+                  event.target.value
+                )
               }
               onKeyDown={handleKeyDown}
               rows={1}
-              disabled={isSending}
+              disabled={
+                isSending ||
+                isUploading
+              }
             />
+
 
             <button
               className={`send-button ${
-                !input.trim() || isSending
+                !input.trim() ||
+                isSending ||
+                isUploading
                   ? "disabled"
                   : ""
               }`}
               aria-label="Send message"
               onClick={onSendMessage}
               disabled={
-                !input.trim() || isSending
+                !input.trim() ||
+                isSending ||
+                isUploading
               }
+              type="button"
             >
               <ArrowUp
                 size={18}
                 strokeWidth={2.4}
               />
             </button>
+
           </div>
 
+
           <div className="composer-footer">
+
             <div className="composer-tools">
-              <button className="composer-tool">
+
+              <button
+                className="composer-tool"
+                onClick={handleAttachClick}
+                disabled={isUploading}
+                type="button"
+              >
                 <Paperclip size={14} />
-                Attach
+
+                {isUploading
+                  ? "Uploading..."
+                  : "Attach"}
+
               </button>
 
-              <button className="composer-tool">
+
+              <button
+                className="composer-tool"
+                type="button"
+              >
                 <Sparkles size={14} />
+
                 Tools
               </button>
+
             </div>
+
 
             <span className="composer-hint">
               Enter to send · Shift + Enter
               for newline
             </span>
+
           </div>
+
         </div>
+
 
         <p className="composer-disclaimer">
           AI Workspace can make mistakes.
           Check important information.
         </p>
+
       </div>
+
     </section>
   );
 }
+
 
 export default ChatWorkspace;

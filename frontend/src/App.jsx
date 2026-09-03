@@ -10,6 +10,7 @@ import {
   getConversations,
   getCurrentUser,
   login,
+  register,
   renameConversation,
   streamMessage,
 } from "./api";
@@ -21,8 +22,13 @@ const TOKEN_KEY =
   "ai_workspace_access_token";
 
 
+/* =========================
+   LOGIN SCREEN
+========================= */
+
 function LoginScreen({
   onLogin,
+  onShowRegister,
   loading,
   error,
 }) {
@@ -33,9 +39,7 @@ function LoginScreen({
     useState("");
 
 
-  const handleSubmit = async (
-    event
-  ) => {
+  const handleSubmit = async (event) => {
     event.preventDefault();
 
     if (
@@ -138,7 +142,14 @@ function LoginScreen({
 
 
         <p className="auth-footer">
-          AI Workspace · Personal account
+          Don't have an account?{" "}
+          <button
+            type="button"
+            className="auth-link"
+            onClick={onShowRegister}
+          >
+            Create account
+          </button>
         </p>
 
       </div>
@@ -146,6 +157,216 @@ function LoginScreen({
   );
 }
 
+
+/* =========================
+   REGISTER SCREEN
+========================= */
+
+function RegisterScreen({
+  onRegister,
+  onShowLogin,
+  loading,
+  error,
+}) {
+  const [username, setUsername] =
+    useState("");
+
+  const [email, setEmail] =
+    useState("");
+
+  const [password, setPassword] =
+    useState("");
+
+  const [firstName, setFirstName] =
+    useState("");
+
+  const [lastName, setLastName] =
+    useState("");
+
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+
+    if (
+      !username.trim() ||
+      !email.trim() ||
+      !password
+    ) {
+      return;
+    }
+
+    await onRegister({
+      username: username.trim(),
+      email: email.trim(),
+      password,
+      first_name: firstName.trim(),
+      last_name: lastName.trim(),
+    });
+  };
+
+
+  return (
+    <div className="auth-screen">
+      <div className="auth-card">
+
+        <div className="auth-brand">
+          <div className="auth-brand-mark">
+            <span>✦</span>
+          </div>
+
+          <span>
+            AI Workspace
+          </span>
+        </div>
+
+
+        <div className="auth-heading">
+          <h1>
+            Create your account
+          </h1>
+
+          <p>
+            Start building in your personal AI workspace.
+          </p>
+        </div>
+
+
+        <form
+          className="auth-form"
+          onSubmit={handleSubmit}
+        >
+
+          <label>
+            Username
+
+            <input
+              type="text"
+              value={username}
+              onChange={(event) =>
+                setUsername(
+                  event.target.value
+                )
+              }
+              placeholder="Choose a username"
+              autoComplete="username"
+            />
+          </label>
+
+
+          <label>
+            Email
+
+            <input
+              type="email"
+              value={email}
+              onChange={(event) =>
+                setEmail(
+                  event.target.value
+                )
+              }
+              placeholder="Enter your email"
+              autoComplete="email"
+            />
+          </label>
+
+
+          <label>
+            Password
+
+            <input
+              type="password"
+              value={password}
+              onChange={(event) =>
+                setPassword(
+                  event.target.value
+                )
+              }
+              placeholder="At least 8 characters"
+              autoComplete="new-password"
+            />
+          </label>
+
+
+          <div
+            className="auth-name-row"
+          >
+
+            <label>
+              First name
+
+              <input
+                type="text"
+                value={firstName}
+                onChange={(event) =>
+                  setFirstName(
+                    event.target.value
+                  )
+                }
+                placeholder="First name"
+                autoComplete="given-name"
+              />
+            </label>
+
+
+            <label>
+              Last name
+
+              <input
+                type="text"
+                value={lastName}
+                onChange={(event) =>
+                  setLastName(
+                    event.target.value
+                  )
+                }
+                placeholder="Last name"
+                autoComplete="family-name"
+              />
+            </label>
+
+          </div>
+
+
+          {error && (
+            <div className="auth-error">
+              {error}
+            </div>
+          )}
+
+
+          <button
+            className="auth-submit"
+            type="submit"
+            disabled={loading}
+          >
+            {loading
+              ? "Creating account..."
+              : "Create account"}
+          </button>
+
+        </form>
+
+
+        <p className="auth-footer">
+          Already have an account?{" "}
+          <button
+            type="button"
+            className="auth-link"
+            onClick={onShowLogin}
+          >
+            Sign in
+          </button>
+        </p>
+
+      </div>
+    </div>
+  );
+}
+
+
+/* =========================
+   APP
+========================= */
 
 function App() {
   const [accessToken, setAccessToken] =
@@ -160,38 +381,60 @@ function App() {
   const [user, setUser] =
     useState(null);
 
+
   const [
     conversations,
     setConversations,
   ] = useState([]);
+
 
   const [
     activeConversationId,
     setActiveConversationId,
   ] = useState(null);
 
+
   const [messages, setMessages] =
     useState([]);
+
 
   const [input, setInput] =
     useState("");
 
+
   const [loading, setLoading] =
     useState(true);
+
 
   const [
     loginLoading,
     setLoginLoading,
   ] = useState(false);
 
+
+  const [
+    registerLoading,
+    setRegisterLoading,
+  ] = useState(false);
+
+
+  const [authMode, setAuthMode] =
+    useState("login");
+
+
   const [
     isSending,
     setIsSending,
   ] = useState(false);
 
+
   const [error, setError] =
     useState("");
 
+
+  /* =========================
+     INITIALIZE WORKSPACE
+  ========================= */
 
   useEffect(() => {
     if (!accessToken) {
@@ -255,23 +498,35 @@ function App() {
       }
 
     } catch (err) {
-      console.error(err);
-
-      localStorage.removeItem(
-        TOKEN_KEY
+      console.error(
+        "INITIALIZATION ERROR:",
+        err
       );
 
-      setAccessToken(null);
-      setUser(null);
-      setConversations([]);
-      setActiveConversationId(null);
-      setMessages([]);
+      /*
+       * IMPORTANT:
+       * Do NOT remove the token here.
+       *
+       * If initialization fails,
+       * we want to see the actual
+       * error instead of silently
+       * redirecting to login.
+       */
+
+      setError(
+        err?.message ||
+          "Failed to initialize workspace."
+      );
 
     } finally {
       setLoading(false);
     }
   }
 
+
+  /* =========================
+     LOGIN
+  ========================= */
 
   async function handleLogin(
     username,
@@ -288,20 +543,32 @@ function App() {
         );
 
 
+      if (!data?.access) {
+        throw new Error(
+          "Login succeeded but no access token was returned."
+        );
+      }
+
+
       localStorage.setItem(
         TOKEN_KEY,
         data.access
       );
+
 
       setAccessToken(
         data.access
       );
 
     } catch (err) {
-      console.error(err);
+      console.error(
+        "LOGIN ERROR:",
+        err
+      );
 
       setError(
         err?.data?.detail ||
+          err?.message ||
           "Invalid username or password."
       );
 
@@ -310,6 +577,111 @@ function App() {
     }
   }
 
+
+  /* =========================
+     REGISTER
+  ========================= */
+
+  async function handleRegister(
+    registrationData
+  ) {
+    try {
+      setRegisterLoading(true);
+      setError("");
+
+
+      await register(
+        registrationData
+      );
+
+
+      /*
+       * Registration does not
+       * automatically log the user in.
+       *
+       * Send them back to login
+       * after successful account
+       * creation.
+       */
+
+      setAuthMode("login");
+
+      setError(
+        "Account created successfully. Please sign in."
+      );
+
+    } catch (err) {
+      console.error(
+        "REGISTER ERROR:",
+        err
+      );
+
+
+      let message =
+        "Unable to create your account.";
+
+
+      if (
+        err?.data &&
+        typeof err.data ===
+          "object"
+      ) {
+        const data =
+          err.data;
+
+
+        if (
+          data.username
+        ) {
+          message =
+            Array.isArray(
+              data.username
+            )
+              ? data.username[0]
+              : data.username;
+        } else if (
+          data.email
+        ) {
+          message =
+            Array.isArray(
+              data.email
+            )
+              ? data.email[0]
+              : data.email;
+        } else if (
+          data.password
+        ) {
+          message =
+            Array.isArray(
+              data.password
+            )
+              ? data.password[0]
+              : data.password;
+        } else if (
+          data.detail
+        ) {
+          message =
+            data.detail;
+        }
+      } else if (
+        err?.message
+      ) {
+        message =
+          err.message;
+      }
+
+
+      setError(message);
+
+    } finally {
+      setRegisterLoading(false);
+    }
+  }
+
+
+  /* =========================
+     LOGOUT
+  ========================= */
 
   function handleLogout() {
     localStorage.removeItem(
@@ -323,16 +695,23 @@ function App() {
     setMessages([]);
     setInput("");
     setError("");
+    setAuthMode("login");
   }
 
+
+  /* =========================
+     NEW CONVERSATION
+  ========================= */
 
   async function handleNewConversation() {
     if (!accessToken) {
       return;
     }
 
+
     try {
       setError("");
+
 
       const conversation =
         await createConversation(
@@ -353,6 +732,7 @@ function App() {
         conversation.id
       );
 
+
       setMessages([]);
       setInput("");
 
@@ -366,6 +746,10 @@ function App() {
   }
 
 
+  /* =========================
+     SELECT CONVERSATION
+  ========================= */
+
   async function handleSelectConversation(
     conversationId
   ) {
@@ -373,8 +757,10 @@ function App() {
       return;
     }
 
+
     try {
       setError("");
+
 
       setActiveConversationId(
         conversationId
@@ -402,12 +788,17 @@ function App() {
   }
 
 
+  /* =========================
+     RENAME CONVERSATION
+  ========================= */
+
   async function handleRenameConversation(
     conversationId,
     title
   ) {
     const cleanTitle =
       title.trim();
+
 
     if (!cleanTitle) {
       return;
@@ -416,6 +807,7 @@ function App() {
 
     try {
       setError("");
+
 
       const updatedConversation =
         await renameConversation(
@@ -446,11 +838,16 @@ function App() {
   }
 
 
+  /* =========================
+     DELETE CONVERSATION
+  ========================= */
+
   async function handleDeleteConversation(
     conversationId
   ) {
     try {
       setError("");
+
 
       await deleteConversation(
         accessToken,
@@ -488,6 +885,10 @@ function App() {
     }
   }
 
+
+  /* =========================
+     SEND MESSAGE
+  ========================= */
 
   async function handleSendMessage() {
     const content =
@@ -654,9 +1055,14 @@ function App() {
   }
 
 
+  /* =========================
+     LOADING SCREEN
+  ========================= */
+
   if (loading) {
     return (
       <div className="app-loading">
+
         <div className="loading-mark">
           <span>✦</span>
         </div>
@@ -664,24 +1070,54 @@ function App() {
         <span>
           Loading workspace...
         </span>
+
       </div>
     );
   }
 
 
-  if (
-    !accessToken ||
-    !user
-  ) {
+  /* =========================
+     AUTH SCREENS
+  ========================= */
+
+  if (!accessToken || !user) {
+
+    if (authMode === "register") {
+      return (
+        <RegisterScreen
+          onRegister={
+            handleRegister
+          }
+          onShowLogin={() => {
+            setAuthMode("login");
+            setError("");
+          }}
+          loading={
+            registerLoading
+          }
+          error={error}
+        />
+      );
+    }
+
+
     return (
       <LoginScreen
         onLogin={handleLogin}
+        onShowRegister={() => {
+          setAuthMode("register");
+          setError("");
+        }}
         loading={loginLoading}
         error={error}
       />
     );
   }
 
+
+  /* =========================
+     ACTIVE CONVERSATION
+  ========================= */
 
   const activeConversation =
     conversations.find(
@@ -691,10 +1127,15 @@ function App() {
     );
 
 
+  /* =========================
+     WORKSPACE
+  ========================= */
+
   return (
     <>
       {error && (
         <div className="global-error">
+
           {error}
 
           <button
@@ -704,6 +1145,7 @@ function App() {
           >
             Dismiss
           </button>
+
         </div>
       )}
 
@@ -734,6 +1176,9 @@ function App() {
       >
 
         <ChatWorkspace
+          accessToken={
+            accessToken
+          }
           conversation={
             activeConversation
           }
@@ -743,9 +1188,7 @@ function App() {
           onSendMessage={
             handleSendMessage
           }
-          isSending={
-            isSending
-          }
+          isSending={isSending}
           onNewConversation={
             handleNewConversation
           }

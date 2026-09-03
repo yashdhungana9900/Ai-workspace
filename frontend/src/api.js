@@ -1,31 +1,60 @@
-const API_BASE_URL = "http://127.0.0.1:8000/api/v1";
+const API_BASE_URL =
+  "http://127.0.0.1:8000/api/v1";
 
 
-async function request(endpoint, options = {}) {
+async function request(
+  endpoint,
+  options = {},
+  accessToken = null
+) {
+  const token =
+    accessToken ||
+    localStorage.getItem(
+      "ai_workspace_access_token"
+    );
+
+  const headers = {
+    ...(options.headers || {}),
+  };
+
+  if (token) {
+    headers.Authorization =
+      `Bearer ${token}`;
+  }
+
   const response = await fetch(
     `${API_BASE_URL}${endpoint}`,
     {
       ...options,
-
-      headers: {
-        "Content-Type": "application/json",
-        ...(options.headers || {}),
-      },
+      headers,
     }
   );
 
-  const data = await response
-    .json()
-    .catch(() => null);
-
-  if (!response.ok) {
-    const error = new Error(
-      data?.detail ||
-        data?.message ||
-        "Something went wrong."
+  const contentType =
+    response.headers.get(
+      "content-type"
     );
 
-    error.status = response.status;
+  const data =
+    contentType?.includes(
+      "application/json"
+    )
+      ? await response.json()
+      : await response.text();
+
+  if (!response.ok) {
+    const message =
+      typeof data === "object" &&
+      data?.detail
+        ? data.detail
+        : typeof data === "object" &&
+          data?.error
+        ? data.error
+        : "Something went wrong.";
+
+    const error =
+      new Error(message);
+
     error.data = data;
 
     throw error;
@@ -35,61 +64,71 @@ async function request(endpoint, options = {}) {
 }
 
 
+/* =========================
+   AUTH
+========================= */
+
 export async function login(
   username,
   password
 ) {
-  return request("/auth/login/", {
-    method: "POST",
-
-    body: JSON.stringify({
-      username,
-      password,
-    }),
-  });
+  return request(
+    "/auth/login/",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type":
+          "application/json",
+      },
+      body: JSON.stringify({
+        username,
+        password,
+      }),
+    }
+  );
 }
 
 
-export async function register({
-  username,
-  email,
-  password,
-  first_name,
-  last_name,
-}) {
-  return request("/auth/register/", {
-    method: "POST",
-
-    body: JSON.stringify({
-      username,
-      email,
-      password,
-      first_name,
-      last_name,
-    }),
-  });
+export async function register(
+  data
+) {
+  return request(
+    "/auth/register/",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type":
+          "application/json",
+      },
+      body: JSON.stringify(data),
+    }
+  );
 }
 
 
 export async function getCurrentUser(
   accessToken
 ) {
-  return request("/auth/me/", {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
+  return request(
+    "/auth/me/",
+    {},
+    accessToken
+  );
 }
 
+
+/* =========================
+   CONVERSATIONS
+========================= */
 
 export async function getConversations(
   accessToken
 ) {
-  return request("/conversations/", {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
+  return request(
+    "/conversations/",
+    {},
+    accessToken
+  );
 }
 
 
@@ -97,17 +136,20 @@ export async function createConversation(
   accessToken,
   title = "New conversation"
 ) {
-  return request("/conversations/", {
-    method: "POST",
-
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
+  return request(
+    "/conversations/",
+    {
+      method: "POST",
+      headers: {
+        "Content-Type":
+          "application/json",
+      },
+      body: JSON.stringify({
+        title,
+      }),
     },
-
-    body: JSON.stringify({
-      title,
-    }),
-  });
+    accessToken
+  );
 }
 
 
@@ -117,11 +159,8 @@ export async function getConversationMessages(
 ) {
   return request(
     `/conversations/${conversationId}/messages/`,
-    {
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    }
+    {},
+    accessToken
   );
 }
 
@@ -135,67 +174,136 @@ export async function sendMessage(
     `/conversations/${conversationId}/messages/`,
     {
       method: "POST",
-
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        "Content-Type":
+          "application/json",
       },
-
       body: JSON.stringify({
         content,
       }),
-    }
+    },
+    accessToken
   );
 }
 
+
+export async function renameConversation(
+  accessToken,
+  conversationId,
+  title
+) {
+  return request(
+    `/conversations/${conversationId}/`,
+    {
+      method: "PATCH",
+      headers: {
+        "Content-Type":
+          "application/json",
+      },
+      body: JSON.stringify({
+        title,
+      }),
+    },
+    accessToken
+  );
+}
+
+
+export async function deleteConversation(
+  accessToken,
+  conversationId
+) {
+  return request(
+    `/conversations/${conversationId}/`,
+    {
+      method: "DELETE",
+    },
+    accessToken
+  );
+}
+
+
+/* =========================
+   STREAMING CHAT
+========================= */
 
 export async function streamMessage(
   accessToken,
   conversationId,
   content,
-  callbacks
+  {
+    onStart,
+    onDelta,
+    onDone,
+    onError,
+  } = {}
 ) {
   const response = await fetch(
     `${API_BASE_URL}/conversations/${conversationId}/messages/`,
     {
       method: "POST",
-
       headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${accessToken}`,
+        "Content-Type":
+          "application/json",
+        Authorization:
+          `Bearer ${accessToken}`,
       },
-
       body: JSON.stringify({
         content,
       }),
     }
   );
 
-  if (!response.ok) {
-    const data = await response
-      .json()
-      .catch(() => null);
-
-    const error = new Error(
-      data?.detail ||
-        data?.message ||
-        "Unable to send message."
+  const contentType =
+    response.headers.get(
+      "content-type"
     );
 
-    error.status = response.status;
-    error.data = data;
+  if (!response.ok) {
+    let errorMessage =
+      "Failed to send message.";
 
-    throw error;
+    try {
+      if (
+        contentType?.includes(
+          "application/json"
+        )
+      ) {
+        const data =
+          await response.json();
+
+        errorMessage =
+          data?.detail ||
+          data?.error ||
+          errorMessage;
+      } else {
+        const text =
+          await response.text();
+
+        if (text) {
+          errorMessage = text;
+        }
+      }
+    } catch {
+      // Keep default error message.
+    }
+
+    throw new Error(
+      errorMessage
+    );
   }
 
   if (!response.body) {
     throw new Error(
-      "Streaming is not supported by this browser."
+      "Streaming is not supported."
     );
   }
 
-  const reader = response.body.getReader();
+  const reader =
+    response.body.getReader();
 
-  const decoder = new TextDecoder();
+  const decoder =
+    new TextDecoder();
 
   let buffer = "";
 
@@ -216,106 +324,287 @@ export async function streamMessage(
       }
     );
 
-    const events = buffer.split(
-      "\n\n"
-    );
+    const events =
+      buffer.split("\n\n");
 
     buffer =
       events.pop() || "";
 
-    for (const eventBlock of events) {
-      if (!eventBlock.trim()) {
-        continue;
-      }
+    for (
+      const rawEvent of events
+    ) {
+      const lines =
+        rawEvent.split("\n");
 
-      let eventType = "message";
+      let eventType =
+        "message";
 
-      let dataLine = "";
+      let data = "";
 
       for (
-        const line of eventBlock.split("\n")
+        const line of lines
       ) {
-        if (line.startsWith("event:")) {
-          eventType = line
-            .slice("event:".length)
-            .trim();
+        if (
+          line.startsWith(
+            "event:"
+          )
+        ) {
+          eventType =
+            line
+              .slice(6)
+              .trim();
         }
 
-        if (line.startsWith("data:")) {
-          dataLine += line
-            .slice("data:".length)
-            .trim();
+        if (
+          line.startsWith(
+            "data:"
+          )
+        ) {
+          data +=
+            line
+              .slice(5)
+              .trim();
         }
       }
 
-      if (!dataLine) {
+      if (!data) {
         continue;
       }
-
-      let data;
 
       try {
-        data = JSON.parse(dataLine);
-      } catch {
-        continue;
-      }
+        const parsed =
+          JSON.parse(data);
 
-      if (eventType === "start") {
-        callbacks?.onStart?.(data);
-      }
+        if (
+          eventType ===
+            "start" &&
+          onStart
+        ) {
+          onStart(parsed);
+        }
 
-      if (eventType === "delta") {
-        callbacks?.onDelta?.(
-          data.content || ""
+        if (
+          eventType ===
+            "delta" &&
+          onDelta
+        ) {
+          onDelta(parsed);
+        }
+
+        if (
+          eventType ===
+            "done" &&
+          onDone
+        ) {
+          onDone(parsed);
+        }
+
+        if (
+          eventType ===
+            "error" &&
+          onError
+        ) {
+          onError(parsed);
+        }
+      } catch (error) {
+        console.error(
+          "Invalid SSE data:",
+          data,
+          error
         );
       }
+    }
+  }
 
-      if (eventType === "done") {
-        callbacks?.onDone?.(data);
+  if (buffer.trim()) {
+    const lines =
+      buffer.split("\n");
+
+    let eventType =
+      "message";
+
+    let data = "";
+
+    for (
+      const line of lines
+    ) {
+      if (
+        line.startsWith(
+          "event:"
+        )
+      ) {
+        eventType =
+          line
+            .slice(6)
+            .trim();
       }
 
-      if (eventType === "error") {
-        callbacks?.onError?.(data);
+      if (
+        line.startsWith(
+          "data:"
+        )
+      ) {
+        data +=
+          line
+            .slice(5)
+            .trim();
+      }
+    }
+
+    if (data) {
+      try {
+        const parsed =
+          JSON.parse(data);
+
+        if (
+          eventType ===
+            "start" &&
+          onStart
+        ) {
+          onStart(parsed);
+        }
+
+        if (
+          eventType ===
+            "delta" &&
+          onDelta
+        ) {
+          onDelta(parsed);
+        }
+
+        if (
+          eventType ===
+            "done" &&
+          onDone
+        ) {
+          onDone(parsed);
+        }
+
+        if (
+          eventType ===
+            "error" &&
+          onError
+        ) {
+          onError(parsed);
+        }
+      } catch (error) {
+        console.error(
+          "Invalid final SSE data:",
+          data,
+          error
+        );
       }
     }
   }
 }
 
 
-export async function renameConversation(
-  accessToken,
-  conversationId,
-  title
+/* =========================
+   DOCUMENTS
+========================= */
+
+export async function getDocuments(
+  accessToken
 ) {
   return request(
-    `/conversations/${conversationId}/`,
-    {
-      method: "PATCH",
-
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-
-      body: JSON.stringify({
-        title,
-      }),
-    }
+    "/documents/",
+    {},
+    accessToken
   );
 }
 
 
-export async function deleteConversation(
+export async function uploadDocument(
   accessToken,
-  conversationId
+  file
+) {
+  const formData =
+    new FormData();
+
+  formData.append(
+    "file",
+    file
+  );
+
+  const response =
+    await fetch(
+      `${API_BASE_URL}/documents/`,
+      {
+        method: "POST",
+        headers: {
+          Authorization:
+            `Bearer ${accessToken}`,
+        },
+        body: formData,
+      }
+    );
+
+  const contentType =
+    response.headers.get(
+      "content-type"
+    );
+
+  const data =
+    contentType?.includes(
+      "application/json"
+    )
+      ? await response.json()
+      : await response.text();
+
+  if (!response.ok) {
+    let message =
+      "Failed to upload document.";
+
+    if (
+      typeof data ===
+      "object"
+    ) {
+      if (
+        Array.isArray(
+          data?.file
+        )
+      ) {
+        message =
+          data.file[0];
+      } else if (
+        data?.file
+      ) {
+        message =
+          data.file;
+      } else if (
+        data?.detail
+      ) {
+        message =
+          data.detail;
+      } else if (
+        data?.error
+      ) {
+        message =
+          data.error;
+      }
+    }
+
+    const error =
+      new Error(message);
+
+    error.data = data;
+
+    throw error;
+  }
+
+  return data;
+}
+
+
+export async function deleteDocument(
+  accessToken,
+  documentId
 ) {
   return request(
-    `/conversations/${conversationId}/`,
+    `/documents/${documentId}/`,
     {
       method: "DELETE",
-
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-      },
-    }
+    },
+    accessToken
   );
 }
