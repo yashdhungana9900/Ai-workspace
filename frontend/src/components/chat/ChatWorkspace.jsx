@@ -24,24 +24,32 @@ function ChatWorkspace({
       title: "Analyze a document",
       description:
         "Summarize, extract insights, or answer questions.",
+      prompt:
+        "Help me analyze this document.",
     },
     {
       icon: Sparkles,
       title: "Build something",
       description:
         "Plan architecture, write code, or debug a problem.",
+      prompt:
+        "Help me design and build a software project.",
     },
     {
       icon: Image,
       title: "Understand an image",
       description:
         "Analyze screenshots, diagrams, or visual content.",
+      prompt:
+        "Help me understand this image.",
     },
     {
       icon: SlidersHorizontal,
       title: "Explore an idea",
       description:
         "Research concepts and turn them into clear plans.",
+      prompt:
+        "Help me explore this idea.",
     },
   ];
 
@@ -59,16 +67,24 @@ function ChatWorkspace({
 
   return (
     <section className="chat-workspace">
+      {/* ================================= */}
+      {/* Header */}
+      {/* ================================= */}
+
       <header className="chat-header">
         <div className="chat-header-left">
           <button className="chat-title-button">
             <div className="chat-title-icon">
-              <Sparkles size={15} strokeWidth={2.1} />
+              <Sparkles
+                size={15}
+                strokeWidth={2.1}
+              />
             </div>
 
             <div className="chat-title-copy">
               <span className="chat-title">
-                {conversation?.title || "New conversation"}
+                {conversation?.title ||
+                  "New conversation"}
               </span>
 
               <span className="chat-subtitle">
@@ -91,118 +107,140 @@ function ChatWorkspace({
 
           <button className="model-selector">
             <span className="model-dot" />
+
             <span>GPT-4o mini</span>
+
             <ChevronDown size={14} />
           </button>
         </div>
       </header>
 
+      {/* ================================= */}
+      {/* Chat Content */}
+      {/* ================================= */}
+
       <div className="chat-content">
         {!hasMessages ? (
           <div className="chat-empty-state">
             <div className="hero-mark">
-              <Sparkles size={22} strokeWidth={2} />
+              <Sparkles
+                size={22}
+                strokeWidth={2}
+              />
             </div>
 
             <div className="hero-copy">
-              <h1>What can I help you build?</h1>
+              <h1>
+                What can I help you build?
+              </h1>
 
               <p>
-                Ask a question, analyze a document, write code,
-                or start something new.
+                Ask a question, analyze a
+                document, write code, or start
+                something new.
               </p>
             </div>
 
+            {/* ================================= */}
+            {/* Suggestions */}
+            {/* ================================= */}
+
             <div className="suggestion-grid">
-              {suggestions.map((suggestion) => {
-                const Icon = suggestion.icon;
+              {suggestions.map(
+                (suggestion) => {
+                  const Icon =
+                    suggestion.icon;
 
-                return (
-                  <button
-                    className="suggestion-card"
-                    key={suggestion.title}
-                    onClick={() =>
-                      setInput(
-                        suggestion.title === "Analyze a document"
-                          ? "Help me analyze this document."
-                          : suggestion.title === "Build something"
-                            ? "Help me design and build a software project."
-                            : suggestion.title ===
-                                "Understand an image"
-                              ? "Help me understand this image."
-                              : "Help me explore this idea."
-                      )
-                    }
-                  >
-                    <div className="suggestion-icon">
-                      <Icon size={17} strokeWidth={1.8} />
-                    </div>
+                  return (
+                    <button
+                      className="suggestion-card"
+                      key={suggestion.title}
+                      onClick={() =>
+                        setInput(
+                          suggestion.prompt
+                        )
+                      }
+                    >
+                      <div className="suggestion-icon">
+                        <Icon
+                          size={17}
+                          strokeWidth={1.8}
+                        />
+                      </div>
 
-                    <div className="suggestion-copy">
-                      <span className="suggestion-title">
-                        {suggestion.title}
-                      </span>
+                      <div className="suggestion-copy">
+                        <span className="suggestion-title">
+                          {suggestion.title}
+                        </span>
 
-                      <span className="suggestion-description">
-                        {suggestion.description}
-                      </span>
-                    </div>
-                  </button>
-                );
-              })}
+                        <span className="suggestion-description">
+                          {
+                            suggestion.description
+                          }
+                        </span>
+                      </div>
+                    </button>
+                  );
+                }
+              )}
             </div>
           </div>
         ) : (
+          /* ================================= */
+          /* Messages */
+          /* ================================= */
+
           <div className="message-list">
-            {messages.map((message) => (
-              <div
-                className={`message-row ${message.role}`}
-                key={message.id}
-              >
-                <div className="message-avatar">
-                  {message.role === "assistant" ? (
-                    <Sparkles size={15} />
-                  ) : (
-                    "Y"
-                  )}
-                </div>
+            {messages.map((message) => {
+              const isStreaming =
+                typeof message.id ===
+                  "string" &&
+                message.id.startsWith(
+                  "streaming-"
+                );
 
-                <div className="message-body">
-                  <div className="message-author">
-                    {message.role === "assistant"
-                      ? "AI Workspace"
-                      : "You"}
+              return (
+                <div
+                  className={`message-row ${
+                    message.role
+                  } ${
+                    isStreaming
+                      ? "streaming"
+                      : ""
+                  }`}
+                  key={message.id}
+                >
+                  <div className="message-avatar">
+                    {message.role ===
+                    "assistant" ? (
+                      <Sparkles size={15} />
+                    ) : (
+                      "Y"
+                    )}
                   </div>
 
-                  <div className="message-content">
-                    {message.content}
+                  <div className="message-body">
+                    <div className="message-author">
+                      {message.role ===
+                      "assistant"
+                        ? "AI Workspace"
+                        : "You"}
+                    </div>
+
+                    <div className="message-content">
+                      {message.content}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-
-            {isSending && (
-              <div className="message-row assistant">
-                <div className="message-avatar">
-                  <Sparkles size={15} />
-                </div>
-
-                <div className="message-body">
-                  <div className="message-author">
-                    AI Workspace
-                  </div>
-
-                  <div className="typing-indicator">
-                    <span />
-                    <span />
-                    <span />
-                  </div>
-                </div>
-              </div>
-            )}
+              );
+            })}
           </div>
         )}
       </div>
+
+      {/* ================================= */}
+      {/* Composer */}
+      {/* ================================= */}
 
       <div className="composer-area">
         <div className="composer">
@@ -218,7 +256,9 @@ function ChatWorkspace({
               className="composer-input"
               placeholder="Message AI Workspace..."
               value={input}
-              onChange={(event) => setInput(event.target.value)}
+              onChange={(event) =>
+                setInput(event.target.value)
+              }
               onKeyDown={handleKeyDown}
               rows={1}
               disabled={isSending}
@@ -226,13 +266,20 @@ function ChatWorkspace({
 
             <button
               className={`send-button ${
-                !input.trim() || isSending ? "disabled" : ""
+                !input.trim() || isSending
+                  ? "disabled"
+                  : ""
               }`}
               aria-label="Send message"
               onClick={onSendMessage}
-              disabled={!input.trim() || isSending}
+              disabled={
+                !input.trim() || isSending
+              }
             >
-              <ArrowUp size={18} strokeWidth={2.4} />
+              <ArrowUp
+                size={18}
+                strokeWidth={2.4}
+              />
             </button>
           </div>
 
@@ -250,13 +297,15 @@ function ChatWorkspace({
             </div>
 
             <span className="composer-hint">
-              Enter to send · Shift + Enter for newline
+              Enter to send · Shift + Enter
+              for newline
             </span>
           </div>
         </div>
 
         <p className="composer-disclaimer">
-          AI Workspace can make mistakes. Check important information.
+          AI Workspace can make mistakes.
+          Check important information.
         </p>
       </div>
     </section>

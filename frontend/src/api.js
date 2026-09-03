@@ -27,10 +27,6 @@ async function request(endpoint, options = {}) {
   return data;
 }
 
-/* ========================= */
-/* Authentication */
-/* ========================= */
-
 export async function login(username, password) {
   return request("/auth/login/", {
     method: "POST",
@@ -68,10 +64,6 @@ export async function getCurrentUser(accessToken) {
   });
 }
 
-/* ========================= */
-/* Conversations */
-/* ========================= */
-
 export async function getConversations(accessToken) {
   return request("/conversations/", {
     headers: {
@@ -82,7 +74,7 @@ export async function getConversations(accessToken) {
 
 export async function createConversation(
   accessToken,
-  title = "New Chat"
+  title = "New conversation"
 ) {
   return request("/conversations/", {
     method: "POST",
@@ -126,6 +118,120 @@ export async function sendMessage(
       }),
     }
   );
+}
+
+export async function streamMessage(
+  accessToken,
+  conversationId,
+  content,
+  callbacks
+) {
+  const response = await fetch(
+    `${API_BASE_URL}/conversations/${conversationId}/messages/`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({
+        content,
+      }),
+    }
+  );
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+
+    const error = new Error(
+      data?.detail ||
+        data?.message ||
+        "Unable to send message."
+    );
+
+    error.status = response.status;
+    error.data = data;
+
+    throw error;
+  }
+
+  if (!response.body) {
+    throw new Error(
+      "Streaming is not supported by this browser."
+    );
+  }
+
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+
+  let buffer = "";
+
+  while (true) {
+    const { value, done } = await reader.read();
+
+    if (done) {
+      break;
+    }
+
+    buffer += decoder.decode(value, {
+      stream: true,
+    });
+
+    const events = buffer.split("\n\n");
+
+    buffer = events.pop() || "";
+
+    for (const eventBlock of events) {
+      if (!eventBlock.trim()) {
+        continue;
+      }
+
+      let eventType = "message";
+      let dataLine = "";
+
+      for (const line of eventBlock.split("\n")) {
+        if (line.startsWith("event:")) {
+          eventType = line
+            .slice("event:".length)
+            .trim();
+        }
+
+        if (line.startsWith("data:")) {
+          dataLine += line
+            .slice("data:".length)
+            .trim();
+        }
+      }
+
+      if (!dataLine) {
+        continue;
+      }
+
+      let data;
+
+      try {
+        data = JSON.parse(dataLine);
+      } catch {
+        continue;
+      }
+
+      if (eventType === "start") {
+        callbacks?.onStart?.(data);
+      }
+
+      if (eventType === "delta") {
+        callbacks?.onDelta?.(data.content || "");
+      }
+
+      if (eventType === "done") {
+        callbacks?.onDone?.(data);
+      }
+
+      if (eventType === "error") {
+        callbacks?.onError?.(data);
+      }
+    }
+  }
 }
 
 export async function deleteConversation(

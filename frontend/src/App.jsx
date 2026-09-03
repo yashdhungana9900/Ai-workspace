@@ -9,7 +9,7 @@ import {
   getConversations,
   getCurrentUser,
   login,
-  sendMessage,
+  streamMessage,
 } from "./api";
 
 import "./App.css";
@@ -35,9 +35,7 @@ function LoginScreen({ onLogin, loading, error }) {
       <div className="auth-card">
         <div className="auth-brand">
           <div className="auth-brand-mark">
-            <span>
-              ✦
-            </span>
+            <span>✦</span>
           </div>
 
           <span>AI Workspace</span>
@@ -163,13 +161,20 @@ function App() {
           );
 
         setMessages(conversationMessages);
+      } else {
+        setActiveConversationId(null);
+        setMessages([]);
       }
     } catch (err) {
       console.error(err);
 
       localStorage.removeItem(TOKEN_KEY);
+
       setAccessToken(null);
       setUser(null);
+      setConversations([]);
+      setActiveConversationId(null);
+      setMessages([]);
     } finally {
       setLoading(false);
     }
@@ -212,6 +217,7 @@ function App() {
     setActiveConversationId(null);
     setMessages([]);
     setInput("");
+    setError("");
   }
 
   async function handleNewConversation() {
@@ -290,42 +296,87 @@ function App() {
       return;
     }
 
+    const streamingMessageId =
+      `streaming-${Date.now()}`;
+
     try {
       setIsSending(true);
       setError("");
-
       setInput("");
 
-      const response = await sendMessage(
+      await streamMessage(
         accessToken,
         activeConversationId,
-        content
-      );
+        content,
+        {
+          onStart: ({ user_message }) => {
+            setMessages((previous) => [
+              ...previous,
+              user_message,
+              {
+                id: streamingMessageId,
+                conversation:
+                  activeConversationId,
+                role: "assistant",
+                content: "",
+                created_at:
+                  new Date().toISOString(),
+              },
+            ]);
+          },
 
-      setMessages((previous) => [
-        ...previous,
-        response.user_message,
-        response.assistant_message,
-      ]);
+          onDelta: (delta) => {
+            setMessages((previous) =>
+              previous.map((message) =>
+                message.id ===
+                streamingMessageId
+                  ? {
+                      ...message,
+                      content:
+                        message.content + delta,
+                    }
+                  : message
+              )
+            );
+          },
 
-      setConversations((previous) =>
-        previous.map((conversation) =>
-          conversation.id ===
-          activeConversationId
-            ? {
-                ...conversation,
-                updated_at:
-                  response.assistant_message
-                    .created_at,
-              }
-            : conversation
-        )
+          onDone: ({ assistant_message }) => {
+            setMessages((previous) =>
+              previous.map((message) =>
+                message.id ===
+                streamingMessageId
+                  ? assistant_message
+                  : message
+              )
+            );
+
+            setConversations((previous) =>
+              previous.map((conversation) =>
+                conversation.id ===
+                activeConversationId
+                  ? {
+                      ...conversation,
+                      updated_at:
+                        assistant_message.created_at,
+                    }
+                  : conversation
+              )
+            );
+          },
+
+          onError: ({ message }) => {
+            setError(
+              message ||
+                "The AI service is currently unavailable."
+            );
+          },
+        }
       );
     } catch (err) {
       console.error(err);
 
       setError(
-        err?.data?.detail ||
+        err?.message ||
           "Unable to send your message."
       );
 
@@ -357,6 +408,13 @@ function App() {
     );
   }
 
+  const activeConversation =
+    conversations.find(
+      (conversation) =>
+        conversation.id ===
+        activeConversationId
+    );
+
   return (
     <>
       {error && (
@@ -386,11 +444,7 @@ function App() {
         onLogout={handleLogout}
       >
         <ChatWorkspace
-          conversation={conversations.find(
-            (conversation) =>
-              conversation.id ===
-              activeConversationId
-          )}
+          conversation={activeConversation}
           messages={messages}
           input={input}
           setInput={setInput}

@@ -1,8 +1,12 @@
+import json
+
+from django.http import StreamingHttpResponse
 from django.shortcuts import get_object_or_404
 
-from rest_framework import generics, status
+from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from .models import Conversation, Message
 from .serializers import ConversationSerializer, MessageSerializer
@@ -65,30 +69,78 @@ class MessageListCreateView(generics.ListCreateAPIView):
             for message in conversation.messages.all()
         ]
 
-        llm_service = LLMService()
+        user_message_data = MessageSerializer(
+            user_message
+        ).data
 
-        assistant_content = llm_service.generate_response(
-            conversation_history
+        def event_stream():
+            yield self._sse_event(
+                "start",
+                {
+                    "user_message": user_message_data,
+                },
+            )
+
+            assistant_content = ""
+
+            try:
+                llm_service = LLMService()
+
+                for delta in llm_service.stream_response(
+                    conversation_history
+                ):
+                    assistant_content += delta
+
+                    yield self._sse_event(
+                        "delta",
+                        {
+                            "content": delta,
+                        },
+                    )
+
+                assistant_message = Message.objects.create(
+                    conversation=conversation,
+                    role=Message.Role.ASSISTANT,
+                    content=assistant_content,
+                )
+
+                conversation.save(
+                    update_fields=["updated_at"]
+                )
+
+                yield self._sse_event(
+                    "done",
+                    {
+                        "assistant_message": MessageSerializer(
+                            assistant_message
+                        ).data,
+                    },
+                )
+
+            except Exception:
+                yield self._sse_event(
+                    "error",
+                    {
+                        "message": (
+                            "The AI service is currently "
+                            "unavailable. Please try again later."
+                        ),
+                    },
+                )
+
+        response = StreamingHttpResponse(
+            event_stream(),
+            content_type="text/event-stream",
         )
 
-        assistant_message = Message.objects.create(
-            conversation=conversation,
-            role=Message.Role.ASSISTANT,
-            content=assistant_content,
-        )
+        response["Cache-Control"] = "no-cache"
+        response["X-Accel-Buffering"] = "no"
 
-        conversation.save(
-            update_fields=["updated_at"]
-        )
+        return response
 
-        return Response(
-            {
-                "user_message": MessageSerializer(
-                    user_message
-                ).data,
-                "assistant_message": MessageSerializer(
-                    assistant_message
-                ).data,
-            },
-            status=status.HTTP_201_CREATED,
+    @staticmethod
+    def _sse_event(event_type, data):
+        return (
+            f"event: {event_type}\n"
+            f"data: {json.dumps(data)}\n\n"
         )
