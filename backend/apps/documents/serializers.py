@@ -3,9 +3,12 @@ from rest_framework import serializers
 from .models import Document
 
 
-class DocumentSerializer(serializers.ModelSerializer):
+class DocumentSerializer(
+    serializers.ModelSerializer
+):
     class Meta:
         model = Document
+
         fields = [
             "id",
             "name",
@@ -13,16 +16,19 @@ class DocumentSerializer(serializers.ModelSerializer):
             "status",
             "file_size",
             "content_type",
+            "extracted_text",
             "error_message",
             "created_at",
             "updated_at",
         ]
+
         read_only_fields = [
             "id",
             "name",
             "status",
             "file_size",
             "content_type",
+            "extracted_text",
             "error_message",
             "created_at",
             "updated_at",

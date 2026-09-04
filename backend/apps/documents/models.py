@@ -16,11 +16,11 @@ class Document(models.Model):
     )
 
     name = models.CharField(
-        max_length=255,
+        max_length=255
     )
 
     file = models.FileField(
-        upload_to="documents/",
+        upload_to="documents/"
     )
 
     status = models.CharField(
@@ -30,24 +30,28 @@ class Document(models.Model):
     )
 
     file_size = models.PositiveBigIntegerField(
-        default=0,
+        default=0
     )
 
     content_type = models.CharField(
         max_length=100,
-        blank=True,
+        blank=True
+    )
+
+    extracted_text = models.TextField(
+        blank=True
     )
 
     error_message = models.TextField(
-        blank=True,
+        blank=True
     )
 
     created_at = models.DateTimeField(
-        auto_now_add=True,
+        auto_now_add=True
     )
 
     updated_at = models.DateTimeField(
-        auto_now=True,
+        auto_now=True
     )
 
     class Meta:
