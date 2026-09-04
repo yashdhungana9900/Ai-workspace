@@ -1,15 +1,19 @@
 from rest_framework import generics
 from rest_framework.permissions import IsAuthenticated
 
-from .models import Document
+from .models import Document, DocumentChunk
 from .serializers import DocumentSerializer
-from .services import extract_document_text
+from .services import (
+    chunk_text,
+    extract_document_text,
+)
 
 
 class DocumentListCreateView(
     generics.ListCreateAPIView
 ):
     serializer_class = DocumentSerializer
+
     permission_classes = [
         IsAuthenticated
     ]
@@ -52,6 +56,27 @@ class DocumentListCreateView(
                 extracted_text
             )
 
+            chunks = chunk_text(
+                extracted_text
+            )
+
+            if not chunks:
+                raise ValueError(
+                    "No chunks could be created from the document."
+                )
+
+            DocumentChunk.objects.bulk_create(
+                [
+                    DocumentChunk(
+                        document=document,
+                        content=chunk,
+                        chunk_index=index,
+                    )
+                    for index, chunk
+                    in enumerate(chunks)
+                ]
+            )
+
             document.status = (
                 Document.Status.READY
             )
@@ -89,6 +114,7 @@ class DocumentDetailView(
     generics.RetrieveDestroyAPIView
 ):
     serializer_class = DocumentSerializer
+
     permission_classes = [
         IsAuthenticated
     ]
