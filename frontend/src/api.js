@@ -1,6 +1,9 @@
 const API_BASE_URL =
   "http://127.0.0.1:8000/api/v1";
 
+const TOKEN_KEY =
+  "ai_workspace_access_token";
+
 
 async function request(
   endpoint,
@@ -9,9 +12,7 @@ async function request(
 ) {
   const token =
     accessToken ||
-    localStorage.getItem(
-      "ai_workspace_access_token"
-    );
+    localStorage.getItem(TOKEN_KEY);
 
   const headers = {
     ...(options.headers || {}),
@@ -31,14 +32,10 @@ async function request(
   );
 
   const contentType =
-    response.headers.get(
-      "content-type"
-    );
+    response.headers.get("content-type");
 
   const data =
-    contentType?.includes(
-      "application/json"
-    )
+    contentType?.includes("application/json")
       ? await response.json()
       : await response.text();
 
@@ -234,6 +231,7 @@ export async function streamMessage(
   {
     onStart,
     onDelta,
+    onSources,
     onDone,
     onError,
   } = {}
@@ -243,69 +241,138 @@ export async function streamMessage(
     {
       method: "POST",
       headers: {
-        "Content-Type":
-          "application/json",
-        Authorization:
-          `Bearer ${accessToken}`,
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
       },
-      body: JSON.stringify({
-        content,
-      }),
+      body: JSON.stringify({ content }),
     }
   );
 
-  const contentType =
-    response.headers.get(
-      "content-type"
-    );
+  const contentType = response.headers.get("content-type");
 
   if (!response.ok) {
-    let errorMessage =
-      "Failed to send message.";
+    let errorMessage = "Failed to send message.";
 
     try {
-      if (
-        contentType?.includes(
-          "application/json"
-        )
-      ) {
-        const data =
-          await response.json();
+      if (contentType?.includes("application/json")) {
+        const data = await response.json();
 
         errorMessage =
           data?.detail ||
           data?.error ||
           errorMessage;
       } else {
-        const text =
-          await response.text();
+        const text = await response.text();
 
         if (text) {
           errorMessage = text;
         }
       }
     } catch {
-      // Keep default error message.
+      // Ignore parsing errors.
     }
 
-    throw new Error(
-      errorMessage
-    );
+    throw new Error(errorMessage);
   }
 
   if (!response.body) {
     throw new Error(
-      "Streaming is not supported."
+      "Streaming is not supported by this browser."
     );
   }
 
-  const reader =
-    response.body.getReader();
-
-  const decoder =
-    new TextDecoder();
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
 
   let buffer = "";
+
+  const processEvent = (rawEvent) => {
+    const lines = rawEvent.split("\n");
+
+    let eventType = "message";
+    let data = "";
+
+    for (const line of lines) {
+      if (line.startsWith("event:")) {
+        eventType = line
+          .slice(6)
+          .trim();
+      }
+
+      if (line.startsWith("data:")) {
+        data += line
+          .slice(5)
+          .trim();
+      }
+    }
+
+    if (!data) {
+      return;
+    }
+
+    try {
+      const parsed = JSON.parse(data);
+
+      /*
+       * Backend currently sends:
+       *
+       * data: {"type":"token", ...}
+       *
+       * rather than:
+       *
+       * event: delta
+       * data: {...}
+       *
+       * Therefore support both formats.
+       */
+
+      const type =
+        eventType !== "message"
+          ? eventType
+          : parsed.type;
+
+      if (type === "start") {
+        if (onStart) {
+          onStart(parsed);
+        }
+      }
+
+      if (
+        type === "token" ||
+        type === "delta"
+      ) {
+        if (onDelta) {
+          onDelta(parsed);
+        }
+      }
+
+      if (type === "sources") {
+        if (onSources) {
+          onSources(
+            parsed.sources || []
+          );
+        }
+      }
+
+      if (type === "done") {
+        if (onDone) {
+          onDone(parsed);
+        }
+      }
+
+      if (type === "error") {
+        if (onError) {
+          onError(parsed);
+        }
+      }
+    } catch (error) {
+      console.error(
+        "Invalid SSE data:",
+        data,
+        error
+      );
+    }
+  };
 
   while (true) {
     const {
@@ -319,9 +386,7 @@ export async function streamMessage(
 
     buffer += decoder.decode(
       value,
-      {
-        stream: true,
-      }
+      { stream: true }
     );
 
     const events =
@@ -330,174 +395,15 @@ export async function streamMessage(
     buffer =
       events.pop() || "";
 
-    for (
-      const rawEvent of events
-    ) {
-      const lines =
-        rawEvent.split("\n");
-
-      let eventType =
-        "message";
-
-      let data = "";
-
-      for (
-        const line of lines
-      ) {
-        if (
-          line.startsWith(
-            "event:"
-          )
-        ) {
-          eventType =
-            line
-              .slice(6)
-              .trim();
-        }
-
-        if (
-          line.startsWith(
-            "data:"
-          )
-        ) {
-          data +=
-            line
-              .slice(5)
-              .trim();
-        }
-      }
-
-      if (!data) {
-        continue;
-      }
-
-      try {
-        const parsed =
-          JSON.parse(data);
-
-        if (
-          eventType ===
-            "start" &&
-          onStart
-        ) {
-          onStart(parsed);
-        }
-
-        if (
-          eventType ===
-            "delta" &&
-          onDelta
-        ) {
-          onDelta(parsed);
-        }
-
-        if (
-          eventType ===
-            "done" &&
-          onDone
-        ) {
-          onDone(parsed);
-        }
-
-        if (
-          eventType ===
-            "error" &&
-          onError
-        ) {
-          onError(parsed);
-        }
-      } catch (error) {
-        console.error(
-          "Invalid SSE data:",
-          data,
-          error
-        );
-      }
+    for (const rawEvent of events) {
+      processEvent(rawEvent);
     }
   }
 
   if (buffer.trim()) {
-    const lines =
-      buffer.split("\n");
-
-    let eventType =
-      "message";
-
-    let data = "";
-
-    for (
-      const line of lines
-    ) {
-      if (
-        line.startsWith(
-          "event:"
-        )
-      ) {
-        eventType =
-          line
-            .slice(6)
-            .trim();
-      }
-
-      if (
-        line.startsWith(
-          "data:"
-        )
-      ) {
-        data +=
-          line
-            .slice(5)
-            .trim();
-      }
-    }
-
-    if (data) {
-      try {
-        const parsed =
-          JSON.parse(data);
-
-        if (
-          eventType ===
-            "start" &&
-          onStart
-        ) {
-          onStart(parsed);
-        }
-
-        if (
-          eventType ===
-            "delta" &&
-          onDelta
-        ) {
-          onDelta(parsed);
-        }
-
-        if (
-          eventType ===
-            "done" &&
-          onDone
-        ) {
-          onDone(parsed);
-        }
-
-        if (
-          eventType ===
-            "error" &&
-          onError
-        ) {
-          onError(parsed);
-        }
-      } catch (error) {
-        console.error(
-          "Invalid final SSE data:",
-          data,
-          error
-        );
-      }
-    }
+    processEvent(buffer);
   }
 }
-
 
 /* =========================
    DOCUMENTS
@@ -518,26 +424,24 @@ export async function uploadDocument(
   accessToken,
   file
 ) {
-  const formData =
-    new FormData();
+  const formData = new FormData();
 
   formData.append(
     "file",
     file
   );
 
-  const response =
-    await fetch(
-      `${API_BASE_URL}/documents/`,
-      {
-        method: "POST",
-        headers: {
-          Authorization:
-            `Bearer ${accessToken}`,
-        },
-        body: formData,
-      }
-    );
+  const response = await fetch(
+    `${API_BASE_URL}/documents/`,
+    {
+      method: "POST",
+      headers: {
+        Authorization:
+          `Bearer ${accessToken}`,
+      },
+      body: formData,
+    }
+  );
 
   const contentType =
     response.headers.get(
@@ -556,31 +460,18 @@ export async function uploadDocument(
       "Failed to upload document.";
 
     if (
-      typeof data ===
-      "object"
+      typeof data === "object"
     ) {
       if (
-        Array.isArray(
-          data?.file
-        )
+        Array.isArray(data?.file)
       ) {
-        message =
-          data.file[0];
-      } else if (
-        data?.file
-      ) {
-        message =
-          data.file;
-      } else if (
-        data?.detail
-      ) {
-        message =
-          data.detail;
-      } else if (
-        data?.error
-      ) {
-        message =
-          data.error;
+        message = data.file[0];
+      } else if (data?.file) {
+        message = data.file;
+      } else if (data?.detail) {
+        message = data.detail;
+      } else if (data?.error) {
+        message = data.error;
       }
     }
 

@@ -279,7 +279,7 @@ function ChatWorkspace({
             <span className="model-dot" />
 
             <span>
-              GPT-4o mini
+              Ollama · llama3.2:3b
             </span>
 
             <ChevronDown size={14} />
@@ -381,6 +381,12 @@ function ChatWorkspace({
                   "streaming-"
                 );
 
+              const sources =
+                message.role === "assistant" &&
+                Array.isArray(message.sources)
+                  ? message.sources
+                  : [];
+
               return (
                 <div
                   className={`message-row ${
@@ -420,6 +426,66 @@ function ChatWorkspace({
                     <div className="message-content">
                       {message.content}
                     </div>
+
+
+                    {sources.length > 0 && (
+                      <div className="message-sources">
+
+                        <div className="message-sources-header">
+                          <FileText size={14} />
+
+                          <span>
+                            Sources
+                          </span>
+                        </div>
+
+
+                        <div className="message-sources-list">
+
+                          {sources.map(
+                            (source, index) => (
+                              <div
+                                className="message-source"
+                                key={`${source.document}-${source.chunk}-${index}`}
+                              >
+
+                                <div className="message-source-icon">
+                                  <FileText
+                                    size={14}
+                                  />
+                                </div>
+
+
+                                <div className="message-source-copy">
+
+                                  <span className="message-source-document">
+                                    {source.document}
+                                  </span>
+
+                                  <span className="message-source-meta">
+                                    Chunk {source.chunk}
+                                    {" · "}
+                                    Relevance{" "}
+                                    {(
+                                      (1 -
+                                        Number(
+                                          source.distance
+                                        )) *
+                                      100
+                                    ).toFixed(1)}
+                                    %
+                                  </span>
+
+                                </div>
+
+                              </div>
+                            )
+                          )}
+
+                        </div>
+
+                      </div>
+                    )}
 
                   </div>
 
@@ -512,7 +578,7 @@ function ChatWorkspace({
 
         {isUploading && (
           <div className="upload-status">
-            Uploading document...
+            Processing document...
           </div>
         )}
 
@@ -547,7 +613,7 @@ function ChatWorkspace({
               className="composer-input"
               placeholder={
                 isUploading
-                  ? "Uploading document..."
+                  ? "Processing document..."
                   : "Message AI Workspace..."
               }
               value={input}
@@ -604,7 +670,7 @@ function ChatWorkspace({
                 <Paperclip size={14} />
 
                 {isUploading
-                  ? "Uploading..."
+                  ? "Processing..."
                   : "Attach"}
 
               </button>

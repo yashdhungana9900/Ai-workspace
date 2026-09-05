@@ -17,7 +17,6 @@ import {
 
 import "./App.css";
 
-
 const TOKEN_KEY =
   "ai_workspace_access_token";
 
@@ -38,7 +37,6 @@ function LoginScreen({
   const [password, setPassword] =
     useState("");
 
-
   const handleSubmit = async (event) => {
     event.preventDefault();
 
@@ -55,7 +53,6 @@ function LoginScreen({
     );
   };
 
-
   return (
     <div className="auth-screen">
       <div className="auth-card">
@@ -70,7 +67,6 @@ function LoginScreen({
           </span>
         </div>
 
-
         <div className="auth-heading">
           <h1>
             Welcome back
@@ -80,7 +76,6 @@ function LoginScreen({
             Sign in to continue to your workspace.
           </p>
         </div>
-
 
         <form
           className="auth-form"
@@ -103,7 +98,6 @@ function LoginScreen({
             />
           </label>
 
-
           <label>
             Password
 
@@ -120,13 +114,11 @@ function LoginScreen({
             />
           </label>
 
-
           {error && (
             <div className="auth-error">
               {error}
             </div>
           )}
-
 
           <button
             className="auth-submit"
@@ -140,9 +132,9 @@ function LoginScreen({
 
         </form>
 
-
         <p className="auth-footer">
           Don't have an account?{" "}
+
           <button
             type="button"
             className="auth-link"
@@ -183,7 +175,6 @@ function RegisterScreen({
   const [lastName, setLastName] =
     useState("");
 
-
   const handleSubmit = async (event) => {
     event.preventDefault();
 
@@ -204,7 +195,6 @@ function RegisterScreen({
     });
   };
 
-
   return (
     <div className="auth-screen">
       <div className="auth-card">
@@ -219,7 +209,6 @@ function RegisterScreen({
           </span>
         </div>
 
-
         <div className="auth-heading">
           <h1>
             Create your account
@@ -229,7 +218,6 @@ function RegisterScreen({
             Start building in your personal AI workspace.
           </p>
         </div>
-
 
         <form
           className="auth-form"
@@ -252,7 +240,6 @@ function RegisterScreen({
             />
           </label>
 
-
           <label>
             Email
 
@@ -268,7 +255,6 @@ function RegisterScreen({
               autoComplete="email"
             />
           </label>
-
 
           <label>
             Password
@@ -286,10 +272,7 @@ function RegisterScreen({
             />
           </label>
 
-
-          <div
-            className="auth-name-row"
-          >
+          <div className="auth-name-row">
 
             <label>
               First name
@@ -306,7 +289,6 @@ function RegisterScreen({
                 autoComplete="given-name"
               />
             </label>
-
 
             <label>
               Last name
@@ -326,13 +308,11 @@ function RegisterScreen({
 
           </div>
 
-
           {error && (
             <div className="auth-error">
               {error}
             </div>
           )}
-
 
           <button
             className="auth-submit"
@@ -346,9 +326,9 @@ function RegisterScreen({
 
         </form>
 
-
         <p className="auth-footer">
           Already have an account?{" "}
+
           <button
             type="button"
             className="auth-link"
@@ -377,56 +357,45 @@ function App() {
         )
     );
 
-
   const [user, setUser] =
     useState(null);
-
 
   const [
     conversations,
     setConversations,
   ] = useState([]);
 
-
   const [
     activeConversationId,
     setActiveConversationId,
   ] = useState(null);
 
-
   const [messages, setMessages] =
     useState([]);
-
 
   const [input, setInput] =
     useState("");
 
-
   const [loading, setLoading] =
     useState(true);
-
 
   const [
     loginLoading,
     setLoginLoading,
   ] = useState(false);
 
-
   const [
     registerLoading,
     setRegisterLoading,
   ] = useState(false);
 
-
   const [authMode, setAuthMode] =
     useState("login");
-
 
   const [
     isSending,
     setIsSending,
   ] = useState(false);
-
 
   const [error, setError] =
     useState("");
@@ -458,7 +427,6 @@ function App() {
 
       setUser(currentUser);
 
-
       const conversationList =
         await getConversations(
           accessToken
@@ -467,7 +435,6 @@ function App() {
       setConversations(
         conversationList
       );
-
 
       if (
         conversationList.length > 0
@@ -478,7 +445,6 @@ function App() {
         setActiveConversationId(
           firstConversation.id
         );
-
 
         const conversationMessages =
           await getConversationMessages(
@@ -502,16 +468,6 @@ function App() {
         "INITIALIZATION ERROR:",
         err
       );
-
-      /*
-       * IMPORTANT:
-       * Do NOT remove the token here.
-       *
-       * If initialization fails,
-       * we want to see the actual
-       * error instead of silently
-       * redirecting to login.
-       */
 
       setError(
         err?.message ||
@@ -542,19 +498,16 @@ function App() {
           password
         );
 
-
       if (!data?.access) {
         throw new Error(
           "Login succeeded but no access token was returned."
         );
       }
 
-
       localStorage.setItem(
         TOKEN_KEY,
         data.access
       );
-
 
       setAccessToken(
         data.access
@@ -589,20 +542,9 @@ function App() {
       setRegisterLoading(true);
       setError("");
 
-
       await register(
         registrationData
       );
-
-
-      /*
-       * Registration does not
-       * automatically log the user in.
-       *
-       * Send them back to login
-       * after successful account
-       * creation.
-       */
 
       setAuthMode("login");
 
@@ -616,10 +558,8 @@ function App() {
         err
       );
 
-
       let message =
         "Unable to create your account.";
-
 
       if (
         err?.data &&
@@ -629,47 +569,41 @@ function App() {
         const data =
           err.data;
 
-
-        if (
-          data.username
-        ) {
+        if (data.username) {
           message =
             Array.isArray(
               data.username
             )
               ? data.username[0]
               : data.username;
-        } else if (
-          data.email
-        ) {
+
+        } else if (data.email) {
           message =
             Array.isArray(
               data.email
             )
               ? data.email[0]
               : data.email;
-        } else if (
-          data.password
-        ) {
+
+        } else if (data.password) {
           message =
             Array.isArray(
               data.password
             )
               ? data.password[0]
               : data.password;
-        } else if (
-          data.detail
-        ) {
+
+        } else if (data.detail) {
           message =
             data.detail;
         }
+
       } else if (
         err?.message
       ) {
         message =
           err.message;
       }
-
 
       setError(message);
 
@@ -708,17 +642,14 @@ function App() {
       return;
     }
 
-
     try {
       setError("");
-
 
       const conversation =
         await createConversation(
           accessToken,
           "New conversation"
         );
-
 
       setConversations(
         (previous) => [
@@ -727,11 +658,9 @@ function App() {
         ]
       );
 
-
       setActiveConversationId(
         conversation.id
       );
-
 
       setMessages([]);
       setInput("");
@@ -757,22 +686,18 @@ function App() {
       return;
     }
 
-
     try {
       setError("");
-
 
       setActiveConversationId(
         conversationId
       );
-
 
       const conversationMessages =
         await getConversationMessages(
           accessToken,
           conversationId
         );
-
 
       setMessages(
         conversationMessages
@@ -799,15 +724,12 @@ function App() {
     const cleanTitle =
       title.trim();
 
-
     if (!cleanTitle) {
       return;
     }
 
-
     try {
       setError("");
-
 
       const updatedConversation =
         await renameConversation(
@@ -815,7 +737,6 @@ function App() {
           conversationId,
           cleanTitle
         );
-
 
       setConversations(
         (previous) =>
@@ -848,12 +769,10 @@ function App() {
     try {
       setError("");
 
-
       await deleteConversation(
         accessToken,
         conversationId
       );
-
 
       setConversations(
         (previous) =>
@@ -863,7 +782,6 @@ function App() {
               conversationId
           )
       );
-
 
       if (
         activeConversationId ===
@@ -894,7 +812,6 @@ function App() {
     const content =
       input.trim();
 
-
     if (
       !content ||
       !accessToken ||
@@ -904,19 +821,55 @@ function App() {
       return;
     }
 
-
     const conversationId =
       activeConversationId;
 
-
     const streamingMessageId =
       `streaming-${Date.now()}`;
-
 
     try {
       setIsSending(true);
       setError("");
       setInput("");
+
+      /*
+       * IMPORTANT:
+       *
+       * Create the user message and
+       * empty assistant message
+       * immediately.
+       *
+       * We no longer wait for an
+       * onStart SSE event because
+       * the Django backend currently
+       * sends token events directly.
+       */
+
+      setMessages((previous) => [
+        ...previous,
+
+        {
+          id: `user-${Date.now()}`,
+          conversation:
+            conversationId,
+          role: "user",
+          content,
+          created_at:
+            new Date().toISOString(),
+        },
+
+        {
+          id:
+            streamingMessageId,
+          conversation:
+            conversationId,
+          role: "assistant",
+          content: "",
+          sources: [],
+          created_at:
+            new Date().toISOString(),
+        },
+      ]);
 
 
       await streamMessage(
@@ -924,55 +877,10 @@ function App() {
         conversationId,
         content,
         {
-          onStart: ({
-            user_message,
-            conversation,
-          }) => {
 
-            setMessages(
-              (previous) => [
-                ...previous,
-                user_message,
-                {
-                  id:
-                    streamingMessageId,
-
-                  conversation:
-                    conversationId,
-
-                  role:
-                    "assistant",
-
-                  content:
-                    "",
-
-                  created_at:
-                    new Date().toISOString(),
-                },
-              ]
-            );
-
-
-            setConversations(
-              (previous) =>
-                previous.map(
-                  (item) =>
-                    item.id ===
-                    conversationId
-                      ? {
-                          ...item,
-
-                          title:
-                            conversation.title,
-
-                          updated_at:
-                            conversation.updated_at,
-                        }
-                      : item
-                )
-            );
-          },
-
+          /* =========================
+             STREAM TOKENS
+          ========================= */
 
           onDelta: (delta) => {
             setMessages(
@@ -983,7 +891,6 @@ function App() {
                     streamingMessageId
                       ? {
                           ...message,
-
                           content:
                             message.content +
                             delta,
@@ -994,53 +901,116 @@ function App() {
           },
 
 
-          onDone: ({
-            assistant_message,
-          }) => {
+          /* =========================
+             RAG SOURCES
+          ========================= */
 
+          onSources: (sources) => {
             setMessages(
               (previous) =>
                 previous.map(
                   (message) =>
                     message.id ===
                     streamingMessageId
-                      ? assistant_message
-                      : message
-                )
-            );
-
-
-            setConversations(
-              (previous) =>
-                previous.map(
-                  (conversation) =>
-                    conversation.id ===
-                    conversationId
                       ? {
-                          ...conversation,
-
-                          updated_at:
-                            assistant_message.created_at,
+                          ...message,
+                          sources,
                         }
-                      : conversation
+                      : message
                 )
             );
           },
 
 
+          /* =========================
+             STREAM COMPLETE
+          ========================= */
+
+          onDone: async () => {
+            try {
+
+              /*
+               * Reload messages from
+               * PostgreSQL.
+               *
+               * This replaces the
+               * temporary streaming
+               * message with the actual
+               * persisted assistant
+               * message.
+               */
+
+              const latestMessages =
+                await getConversationMessages(
+                  accessToken,
+                  conversationId
+                );
+
+              setMessages(
+                latestMessages
+              );
+
+
+              /*
+               * Refresh conversation
+               * title and updated_at.
+               */
+
+              const latestConversations =
+                await getConversations(
+                  accessToken
+                );
+
+              setConversations(
+                latestConversations
+              );
+
+            } catch (error) {
+              console.error(
+                "Failed to refresh conversation:",
+                error
+              );
+            }
+          },
+
+
+          /* =========================
+             STREAM ERROR
+          ========================= */
+
           onError: ({
             message,
           }) => {
+
             setError(
               message ||
                 "The AI service is currently unavailable."
+            );
+
+
+            /*
+             * Remove the temporary
+             * assistant message.
+             */
+
+            setMessages(
+              (previous) =>
+                previous.filter(
+                  (message) =>
+                    message.id !==
+                    streamingMessageId
+                )
             );
           },
         }
       );
 
     } catch (err) {
-      console.error(err);
+
+      console.error(
+        "SEND MESSAGE ERROR:",
+        err
+      );
 
       setError(
         err?.message ||
@@ -1048,6 +1018,22 @@ function App() {
       );
 
       setInput(content);
+
+
+      /*
+       * Remove temporary assistant
+       * message if the request itself
+       * failed.
+       */
+
+      setMessages(
+        (previous) =>
+          previous.filter(
+            (message) =>
+              message.id !==
+              streamingMessageId
+          )
+      );
 
     } finally {
       setIsSending(false);
@@ -1080,16 +1066,25 @@ function App() {
      AUTH SCREENS
   ========================= */
 
-  if (!accessToken || !user) {
+  if (
+    !accessToken ||
+    !user
+  ) {
 
-    if (authMode === "register") {
+    if (
+      authMode ===
+      "register"
+    ) {
       return (
         <RegisterScreen
           onRegister={
             handleRegister
           }
           onShowLogin={() => {
-            setAuthMode("login");
+            setAuthMode(
+              "login"
+            );
+
             setError("");
           }}
           loading={
@@ -1100,15 +1095,21 @@ function App() {
       );
     }
 
-
     return (
       <LoginScreen
-        onLogin={handleLogin}
+        onLogin={
+          handleLogin
+        }
         onShowRegister={() => {
-          setAuthMode("register");
+          setAuthMode(
+            "register"
+          );
+
           setError("");
         }}
-        loading={loginLoading}
+        loading={
+          loginLoading
+        }
         error={error}
       />
     );
@@ -1149,7 +1150,6 @@ function App() {
         </div>
       )}
 
-
       <ProductShell
         user={user}
         conversations={
@@ -1182,13 +1182,21 @@ function App() {
           conversation={
             activeConversation
           }
-          messages={messages}
-          input={input}
-          setInput={setInput}
+          messages={
+            messages
+          }
+          input={
+            input
+          }
+          setInput={
+            setInput
+          }
           onSendMessage={
             handleSendMessage
           }
-          isSending={isSending}
+          isSending={
+            isSending
+          }
           onNewConversation={
             handleNewConversation
           }
