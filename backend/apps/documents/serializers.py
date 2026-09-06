@@ -3,12 +3,9 @@ from rest_framework import serializers
 from .models import Document
 
 
-class DocumentSerializer(
-    serializers.ModelSerializer
-):
+class DocumentSerializer(serializers.ModelSerializer):
     class Meta:
         model = Document
-
         fields = [
             "id",
             "name",
@@ -21,7 +18,6 @@ class DocumentSerializer(
             "created_at",
             "updated_at",
         ]
-
         read_only_fields = [
             "id",
             "name",
@@ -63,5 +59,10 @@ class DocumentSerializer(
             file=uploaded_file,
             file_size=uploaded_file.size,
             content_type=uploaded_file.content_type,
-            status=Document.Status.PENDING,
+            status=validated_data.get(
+                "status",
+                Document.Status.PENDING,
+            ),
+            workspace=self.context["workspace"],
+            error_message=validated_data.get("error_message", ""),
         )
