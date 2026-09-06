@@ -1,3 +1,5 @@
+from apps.users.models import Workspace
+
 from .search import DocumentSearchService
 
 
@@ -11,10 +13,19 @@ class RAGService:
         self.max_results = max_results
         self.max_distance = max_distance
 
-    def retrieve_context(self, query, user):
+    def retrieve_context(
+        self,
+        query,
+        workspace,
+    ):
+        if not isinstance(workspace, Workspace):
+            raise ValueError(
+                "A valid workspace is required."
+            )
+
         results = self.search_service.search(
             query=query,
-            user=user,
+            workspace=workspace,
             limit=self.max_results,
             max_distance=self.max_distance,
         )
@@ -31,6 +42,8 @@ class RAGService:
                 f"{result.content}"
             )
 
-        context = "\n\n---\n\n".join(context_parts)
+        context = "\n\n---\n\n".join(
+            context_parts
+        )
 
         return context, results

@@ -1,7 +1,15 @@
 from django.urls import path
 from rest_framework_simplejwt.views import TokenRefreshView
 
-from .views import LoginView, MeView, RegisterView
+from .views import (
+    LoginView,
+    MeView,
+    RegisterView,
+    WorkspaceDetailView,
+    WorkspaceListCreateView,
+    WorkspaceMemberDetailView,
+    WorkspaceMemberListCreateView,
+)
 
 
 urlpatterns = [
@@ -24,5 +32,26 @@ urlpatterns = [
         "me/",
         MeView.as_view(),
         name="me",
+    ),
+
+    path(
+        "workspaces/",
+        WorkspaceListCreateView.as_view(),
+        name="workspace-list-create",
+    ),
+    path(
+        "workspaces/<int:pk>/",
+        WorkspaceDetailView.as_view(),
+        name="workspace-detail",
+    ),
+    path(
+        "workspaces/<int:pk>/members/",
+        WorkspaceMemberListCreateView.as_view(),
+        name="workspace-member-list-create",
+    ),
+    path(
+        "workspaces/<int:pk>/members/<int:user_id>/",
+        WorkspaceMemberDetailView.as_view(),
+        name="workspace-member-detail",
     ),
 ]

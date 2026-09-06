@@ -1,5 +1,7 @@
 from pgvector.django import CosineDistance
 
+from apps.users.models import Workspace
+
 from .embedding import EmbeddingService
 from .models import DocumentChunk
 
@@ -14,7 +16,7 @@ class DocumentSearchService:
     def search(
         self,
         query,
-        user,
+        workspace,
         limit=DEFAULT_LIMIT,
         max_distance=DEFAULT_MAX_DISTANCE,
     ):
@@ -27,12 +29,19 @@ class DocumentSearchService:
         if max_distance <= 0:
             raise ValueError("Max distance must be greater than zero.")
 
-        query_embedding = self.embedding_service.generate_embedding(query)
+        if not isinstance(workspace, Workspace):
+            raise ValueError("A valid workspace is required.")
+
+        query_embedding = (
+            self.embedding_service.generate_embedding(
+                query
+            )
+        )
 
         chunks = (
             DocumentChunk.objects
             .filter(
-                document__user=user,
+                document__workspace=workspace,
                 document__status="ready",
                 embedding__isnull=False,
             )

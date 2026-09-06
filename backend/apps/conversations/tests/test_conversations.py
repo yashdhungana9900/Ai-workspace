@@ -5,6 +5,7 @@ from rest_framework import status
 from rest_framework.test import APITestCase
 
 from apps.conversations.models import Conversation, Message
+from apps.users.models import Workspace, WorkspaceMember
 
 
 User = get_user_model()
@@ -25,10 +26,52 @@ class ConversationTests(APITestCase):
             password="TestPassword123!",
         )
 
-        self.conversations_url = "/api/v1/conversations/"
+        self.outsider = User.objects.create_user(
+            username="outsider",
+            email="outsider@example.com",
+            password="TestPassword123!",
+        )
+
+        self.workspace = Workspace.objects.create(
+            name="Test Workspace",
+            owner=self.user,
+        )
+
+        WorkspaceMember.objects.create(
+            workspace=self.workspace,
+            user=self.user,
+            role=WorkspaceMember.Role.OWNER,
+        )
+
+        self.other_workspace = Workspace.objects.create(
+            name="Other Workspace",
+            owner=self.other_user,
+        )
+
+        WorkspaceMember.objects.create(
+            workspace=self.other_workspace,
+            user=self.other_user,
+            role=WorkspaceMember.Role.OWNER,
+        )
+
+        self.conversations_url = (
+            "/api/v1/conversations/"
+        )
 
         self.client.force_authenticate(
             user=self.user
+        )
+
+    def create_conversation(
+        self,
+        user,
+        workspace,
+        title="Test Conversation",
+    ):
+        return Conversation.objects.create(
+            user=user,
+            workspace=workspace,
+            title=title,
         )
 
     def test_authenticated_user_can_create_conversation(self):
@@ -36,6 +79,7 @@ class ConversationTests(APITestCase):
             self.conversations_url,
             {
                 "title": "My Test Conversation",
+                "workspace_id": self.workspace.id,
             },
             format="json",
         )
@@ -48,23 +92,29 @@ class ConversationTests(APITestCase):
         self.assertTrue(
             Conversation.objects.filter(
                 user=self.user,
+                workspace=self.workspace,
                 title="My Test Conversation",
             ).exists()
         )
 
     def test_authenticated_user_can_list_own_conversations(self):
-        Conversation.objects.create(
-            user=self.user,
-            title="My Conversation",
+        self.create_conversation(
+            self.user,
+            self.workspace,
+            "My Conversation",
         )
 
-        Conversation.objects.create(
-            user=self.other_user,
-            title="Other Conversation",
+        self.create_conversation(
+            self.other_user,
+            self.other_workspace,
+            "Other Conversation",
         )
 
         response = self.client.get(
-            self.conversations_url
+            self.conversations_url,
+            {
+                "workspace_id": self.workspace.id,
+            },
         )
 
         self.assertEqual(
@@ -82,14 +132,18 @@ class ConversationTests(APITestCase):
             "My Conversation",
         )
 
-    def test_user_cannot_access_another_users_conversation(self):
-        conversation = Conversation.objects.create(
-            user=self.other_user,
-            title="Private Conversation",
+    def test_user_cannot_access_another_workspace_conversation(
+        self,
+    ):
+        conversation = self.create_conversation(
+            self.other_user,
+            self.other_workspace,
+            "Private Conversation",
         )
 
         response = self.client.get(
-            f"{self.conversations_url}{conversation.id}/"
+            f"{self.conversations_url}"
+            f"{conversation.id}/"
         )
 
         self.assertEqual(
@@ -97,14 +151,46 @@ class ConversationTests(APITestCase):
             status.HTTP_404_NOT_FOUND,
         )
 
+    def test_user_can_access_shared_workspace_conversation(
+        self,
+    ):
+        WorkspaceMember.objects.create(
+            workspace=self.workspace,
+            user=self.other_user,
+            role=WorkspaceMember.Role.MEMBER,
+        )
+
+        conversation = self.create_conversation(
+            self.other_user,
+            self.workspace,
+            "Shared Conversation",
+        )
+
+        response = self.client.get(
+            f"{self.conversations_url}"
+            f"{conversation.id}/"
+        )
+
+        self.assertEqual(
+            response.status_code,
+            status.HTTP_200_OK,
+        )
+
+        self.assertEqual(
+            response.data["title"],
+            "Shared Conversation",
+        )
+
     def test_user_can_rename_own_conversation(self):
-        conversation = Conversation.objects.create(
-            user=self.user,
-            title="Old Title",
+        conversation = self.create_conversation(
+            self.user,
+            self.workspace,
+            "Old Title",
         )
 
         response = self.client.patch(
-            f"{self.conversations_url}{conversation.id}/",
+            f"{self.conversations_url}"
+            f"{conversation.id}/",
             {
                 "title": "New Title",
             },
@@ -124,13 +210,15 @@ class ConversationTests(APITestCase):
         )
 
     def test_user_can_delete_own_conversation(self):
-        conversation = Conversation.objects.create(
-            user=self.user,
-            title="Delete Me",
+        conversation = self.create_conversation(
+            self.user,
+            self.workspace,
+            "Delete Me",
         )
 
         response = self.client.delete(
-            f"{self.conversations_url}{conversation.id}/"
+            f"{self.conversations_url}"
+            f"{conversation.id}/"
         )
 
         self.assertEqual(
@@ -144,7 +232,9 @@ class ConversationTests(APITestCase):
             ).exists()
         )
 
-    def test_unauthenticated_user_cannot_access_conversations(self):
+    def test_unauthenticated_user_cannot_access_conversations(
+        self,
+    ):
         self.client.force_authenticate(
             user=None
         )
@@ -159,9 +249,10 @@ class ConversationTests(APITestCase):
         )
 
     def test_user_can_list_messages(self):
-        conversation = Conversation.objects.create(
-            user=self.user,
-            title="Message Test",
+        conversation = self.create_conversation(
+            self.user,
+            self.workspace,
+            "Message Test",
         )
 
         Message.objects.create(
@@ -196,10 +287,13 @@ class ConversationTests(APITestCase):
             "Hello",
         )
 
-    def test_user_cannot_access_other_users_messages(self):
-        conversation = Conversation.objects.create(
-            user=self.other_user,
-            title="Private Conversation",
+    def test_user_cannot_access_other_workspace_messages(
+        self,
+    ):
+        conversation = self.create_conversation(
+            self.other_user,
+            self.other_workspace,
+            "Private Conversation",
         )
 
         Message.objects.create(
@@ -219,9 +313,10 @@ class ConversationTests(APITestCase):
         )
 
     def test_empty_message_is_rejected(self):
-        conversation = Conversation.objects.create(
-            user=self.user,
-            title="Empty Message Test",
+        conversation = self.create_conversation(
+            self.user,
+            self.workspace,
+            "Empty Message Test",
         )
 
         response = self.client.post(
@@ -254,9 +349,10 @@ class ConversationTests(APITestCase):
             ["Hello", " from", " AI"]
         )
 
-        conversation = Conversation.objects.create(
-            user=self.user,
-            title="New Chat",
+        conversation = self.create_conversation(
+            self.user,
+            self.workspace,
+            "New Chat",
         )
 
         response = self.client.post(

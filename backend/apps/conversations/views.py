@@ -9,6 +9,7 @@ from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.documents.rag import RAGService
+from apps.users.models import Workspace, WorkspaceMember
 
 from .models import Conversation, Message
 from .serializers import (
@@ -25,13 +26,54 @@ class ConversationListCreateView(
     permission_classes = [IsAuthenticated]
 
     def get_queryset(self):
-        return Conversation.objects.filter(
-            user=self.request.user
+        workspace_id = self.request.query_params.get(
+            "workspace_id"
         )
 
+        if not workspace_id:
+            return Conversation.objects.none()
+
+        return Conversation.objects.filter(
+            workspace_id=workspace_id,
+            workspace__members__user=self.request.user,
+        ).distinct()
+
     def perform_create(self, serializer):
+        workspace_id = self.request.data.get(
+            "workspace_id"
+        )
+
+        if not workspace_id:
+            from rest_framework.exceptions import ValidationError
+
+            raise ValidationError(
+                {
+                    "workspace_id": (
+                        "Workspace ID is required."
+                    )
+                }
+            )
+
+        workspace = get_object_or_404(
+            Workspace,
+            id=workspace_id,
+        )
+
+        is_member = WorkspaceMember.objects.filter(
+            workspace=workspace,
+            user=self.request.user,
+        ).exists()
+
+        if not is_member:
+            from rest_framework.exceptions import PermissionDenied
+
+            raise PermissionDenied(
+                "You are not a member of this workspace."
+            )
+
         serializer.save(
-            user=self.request.user
+            user=self.request.user,
+            workspace=workspace,
         )
 
 
@@ -43,8 +85,8 @@ class ConversationDetailView(
 
     def get_queryset(self):
         return Conversation.objects.filter(
-            user=self.request.user
-        )
+            workspace__members__user=self.request.user,
+        ).distinct()
 
 
 class MessageListCreateView(APIView):
@@ -58,7 +100,7 @@ class MessageListCreateView(APIView):
         return get_object_or_404(
             Conversation,
             id=conversation_id,
-            user=user,
+            workspace__members__user=user,
         )
 
     def get(
@@ -78,9 +120,7 @@ class MessageListCreateView(APIView):
             many=True,
         )
 
-        return Response(
-            serializer.data
-        )
+        return Response(serializer.data)
 
     def post(
         self,
@@ -107,19 +147,11 @@ class MessageListCreateView(APIView):
                 status=400,
             )
 
-        # ---------------------------------
-        # SAVE USER MESSAGE
-        # ---------------------------------
-
         Message.objects.create(
             conversation=conversation,
             role=Message.Role.USER,
             content=content,
         )
-
-        # ---------------------------------
-        # AUTO-GENERATE CONVERSATION TITLE
-        # ---------------------------------
 
         if conversation.title in [
             "New Chat",
@@ -139,20 +171,12 @@ class MessageListCreateView(APIView):
                 ]
             )
 
-        # ---------------------------------
-        # LOAD CONVERSATION HISTORY
-        # ---------------------------------
-
         history = list(
             conversation.messages.values(
                 "role",
                 "content",
             )
         )
-
-        # ---------------------------------
-        # RAG RETRIEVAL
-        # ---------------------------------
 
         rag_service = RAGService(
             max_results=3,
@@ -163,17 +187,12 @@ class MessageListCreateView(APIView):
             context, results = (
                 rag_service.retrieve_context(
                     content,
-                    request.user,
+                    conversation.workspace,
                 )
             )
-
         except Exception:
             context = ""
             results = []
-
-        # ---------------------------------
-        # BUILD LLM CONTEXT
-        # ---------------------------------
 
         if context:
             system_message = {
@@ -182,17 +201,14 @@ class MessageListCreateView(APIView):
                     "You are an AI assistant with "
                     "access to the user's uploaded "
                     "documents.\n\n"
-
                     "Use the document context below "
                     "when it is relevant to the "
                     "user's question.\n"
-
                     "If the context does not contain "
                     "enough information, say that the "
                     "uploaded documents do not provide "
                     "enough information. Do not invent "
                     "facts from the documents.\n\n"
-
                     f"DOCUMENT CONTEXT:\n{context}"
                 ),
             }
@@ -201,13 +217,8 @@ class MessageListCreateView(APIView):
                 system_message,
                 *history,
             ]
-
         else:
             llm_messages = history
-
-        # ---------------------------------
-        # BUILD SOURCE METADATA
-        # ---------------------------------
 
         sources = [
             {
@@ -221,10 +232,6 @@ class MessageListCreateView(APIView):
             for result in results
         ]
 
-        # ---------------------------------
-        # STREAM LLM RESPONSE
-        # ---------------------------------
-
         def event_stream():
             full_response = []
 
@@ -236,9 +243,7 @@ class MessageListCreateView(APIView):
                         llm_messages
                     )
                 ):
-                    full_response.append(
-                        chunk
-                    )
+                    full_response.append(chunk)
 
                     yield (
                         "data: "
@@ -251,19 +256,11 @@ class MessageListCreateView(APIView):
                         + "\n\n"
                     )
 
-                # ---------------------------------
-                # BUILD COMPLETE ASSISTANT RESPONSE
-                # ---------------------------------
-
                 assistant_content = (
                     "".join(
                         full_response
                     ).strip()
                 )
-
-                # ---------------------------------
-                # SAVE ASSISTANT MESSAGE + SOURCES
-                # ---------------------------------
 
                 if assistant_content:
                     Message.objects.create(
@@ -273,19 +270,11 @@ class MessageListCreateView(APIView):
                         sources=sources,
                     )
 
-                # ---------------------------------
-                # UPDATE CONVERSATION TIMESTAMP
-                # ---------------------------------
-
                 conversation.save(
                     update_fields=[
                         "updated_at",
                     ]
                 )
-
-                # ---------------------------------
-                # SEND SOURCES TO FRONTEND
-                # ---------------------------------
 
                 if sources:
                     yield (
@@ -298,10 +287,6 @@ class MessageListCreateView(APIView):
                         )
                         + "\n\n"
                     )
-
-                # ---------------------------------
-                # STREAM COMPLETE
-                # ---------------------------------
 
                 yield (
                     "data: "
@@ -333,10 +318,6 @@ class MessageListCreateView(APIView):
                     )
                     + "\n\n"
                 )
-
-        # ---------------------------------
-        # SSE RESPONSE
-        # ---------------------------------
 
         response = StreamingHttpResponse(
             event_stream(),
