@@ -6,27 +6,32 @@ from .models import Document, DocumentChunk
 from .services import chunk_text, extract_document_text
 
 
-@shared_task
-def process_document(document_id):
+@shared_task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_kwargs={"max_retries": 3},
+)
+def process_document(self, document_id):
+    document = Document.objects.get(
+        id=document_id
+    )
+
+    document.status = Document.Status.PROCESSING
+    document.error_message = ""
+
+    document.save(
+        update_fields=[
+            "status",
+            "error_message",
+            "updated_at",
+        ]
+    )
+
     try:
-        document = Document.objects.get(
-            id=document_id
-        )
-
-        document.status = Document.Status.PROCESSING
-        document.error_message = ""
-
-        document.save(
-            update_fields=[
-                "status",
-                "error_message",
-                "updated_at",
-            ]
-        )
-
-        # -------------------------------------------------
+        # ---------------------------------------------
         # EXTRACT TEXT
-        # -------------------------------------------------
+        # ---------------------------------------------
 
         extracted_text = extract_document_text(
             document
@@ -37,9 +42,9 @@ def process_document(document_id):
                 "No text could be extracted from the document."
             )
 
-        # -------------------------------------------------
+        # ---------------------------------------------
         # CHUNK TEXT
-        # -------------------------------------------------
+        # ---------------------------------------------
 
         chunks = chunk_text(
             extracted_text
@@ -50,9 +55,9 @@ def process_document(document_id):
                 "No chunks could be created from the document."
             )
 
-        # -------------------------------------------------
+        # ---------------------------------------------
         # GENERATE EMBEDDINGS
-        # -------------------------------------------------
+        # ---------------------------------------------
 
         embedding_service = EmbeddingService()
 
@@ -67,13 +72,15 @@ def process_document(document_id):
                 "Number of embeddings does not match number of chunks."
             )
 
-        # -------------------------------------------------
+        # ---------------------------------------------
         # SAVE DOCUMENT + CHUNKS
-        # -------------------------------------------------
+        # ---------------------------------------------
 
         with transaction.atomic():
 
-            document.extracted_text = extracted_text
+            document.extracted_text = (
+                extracted_text
+            )
 
             DocumentChunk.objects.filter(
                 document=document
@@ -86,7 +93,10 @@ def process_document(document_id):
                     chunk_index=index,
                     embedding=embedding,
                 )
-                for index, (chunk, embedding) in enumerate(
+                for index, (
+                    chunk,
+                    embedding,
+                ) in enumerate(
                     zip(chunks, embeddings)
                 )
             ]
@@ -95,7 +105,10 @@ def process_document(document_id):
                 document_chunks
             )
 
-            document.status = Document.Status.READY
+            document.status = (
+                Document.Status.READY
+            )
+
             document.error_message = ""
 
             document.save(
@@ -107,26 +120,20 @@ def process_document(document_id):
                 ]
             )
 
-    except Document.DoesNotExist:
-        raise
-
     except Exception as exc:
 
-        try:
-            document = Document.objects.get(
-                id=document_id
-            )
+        document.status = (
+            Document.Status.FAILED
+        )
 
-            document.status = Document.Status.FAILED
-            document.error_message = str(exc)
+        document.error_message = str(exc)
 
-            document.save(
-                update_fields=[
-                    "status",
-                    "error_message",
-                    "updated_at",
-                ]
-            )
+        document.save(
+            update_fields=[
+                "status",
+                "error_message",
+                "updated_at",
+            ]
+        )
 
-        except Document.DoesNotExist:
-            raise
+        raise

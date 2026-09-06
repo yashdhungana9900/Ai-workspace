@@ -5,23 +5,10 @@ import os
 from dotenv import load_dotenv
 
 
-# ---------------------------------------------------------
-# BASE DIRECTORY
-# ---------------------------------------------------------
-
 BASE_DIR = Path(__file__).resolve().parent.parent
-
-
-# ---------------------------------------------------------
-# ENVIRONMENT VARIABLES
-# ---------------------------------------------------------
 
 load_dotenv(BASE_DIR / ".env")
 
-
-# ---------------------------------------------------------
-# SECURITY
-# ---------------------------------------------------------
 
 SECRET_KEY = os.getenv(
     "DJANGO_SECRET_KEY",
@@ -36,10 +23,6 @@ ALLOWED_HOSTS = [
 ]
 
 
-# ---------------------------------------------------------
-# APPLICATIONS
-# ---------------------------------------------------------
-
 INSTALLED_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
@@ -48,24 +31,18 @@ INSTALLED_APPS = [
     "django.contrib.messages",
     "django.contrib.staticfiles",
 
-    # Third-party
     "rest_framework",
     "corsheaders",
+    "drf_spectacular",
 
-    # Local apps
     "apps.users",
     "apps.conversations",
     "apps.documents",
 ]
 
 
-# ---------------------------------------------------------
-# MIDDLEWARE
-# ---------------------------------------------------------
-
 MIDDLEWARE = [
     "corsheaders.middleware.CorsMiddleware",
-
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
     "django.middleware.common.CommonMiddleware",
@@ -76,27 +53,16 @@ MIDDLEWARE = [
 ]
 
 
-# ---------------------------------------------------------
-# URLS / WSGI
-# ---------------------------------------------------------
-
 ROOT_URLCONF = "config.urls"
 
 WSGI_APPLICATION = "config.wsgi.application"
 
 
-# ---------------------------------------------------------
-# TEMPLATES
-# ---------------------------------------------------------
-
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-
         "DIRS": [],
-
         "APP_DIRS": True,
-
         "OPTIONS": {
             "context_processors": [
                 "django.template.context_processors.request",
@@ -107,10 +73,6 @@ TEMPLATES = [
     },
 ]
 
-
-# ---------------------------------------------------------
-# DATABASE
-# ---------------------------------------------------------
 
 DATABASES = {
     "default": {
@@ -124,48 +86,24 @@ DATABASES = {
 }
 
 
-# ---------------------------------------------------------
-# CUSTOM USER MODEL
-# ---------------------------------------------------------
-
 AUTH_USER_MODEL = "users.User"
 
 
-# ---------------------------------------------------------
-# PASSWORD VALIDATION
-# ---------------------------------------------------------
-
 AUTH_PASSWORD_VALIDATORS = [
     {
-        "NAME": (
-            "django.contrib.auth.password_validation."
-            "UserAttributeSimilarityValidator"
-        ),
+        "NAME": "django.contrib.auth.password_validation.UserAttributeSimilarityValidator",
     },
     {
-        "NAME": (
-            "django.contrib.auth.password_validation."
-            "MinimumLengthValidator"
-        ),
+        "NAME": "django.contrib.auth.password_validation.MinimumLengthValidator",
     },
     {
-        "NAME": (
-            "django.contrib.auth.password_validation."
-            "CommonPasswordValidator"
-        ),
+        "NAME": "django.contrib.auth.password_validation.CommonPasswordValidator",
     },
     {
-        "NAME": (
-            "django.contrib.auth.password_validation."
-            "NumericPasswordValidator"
-        ),
+        "NAME": "django.contrib.auth.password_validation.NumericPasswordValidator",
     },
 ]
 
-
-# ---------------------------------------------------------
-# INTERNATIONALIZATION
-# ---------------------------------------------------------
 
 LANGUAGE_CODE = "en-us"
 
@@ -176,74 +114,41 @@ USE_I18N = True
 USE_TZ = True
 
 
-# ---------------------------------------------------------
-# STATIC FILES
-# ---------------------------------------------------------
-
 STATIC_URL = "static/"
 
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-
-# ---------------------------------------------------------
-# MEDIA FILES
-# ---------------------------------------------------------
 
 MEDIA_URL = "/media/"
 
 MEDIA_ROOT = BASE_DIR / "media"
 
 
-# ---------------------------------------------------------
-# DEFAULT PRIMARY KEY
-# ---------------------------------------------------------
-
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-
-# ---------------------------------------------------------
-# DJANGO REST FRAMEWORK
-# ---------------------------------------------------------
 
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
     ),
-
     "DEFAULT_PERMISSION_CLASSES": (
         "rest_framework.permissions.IsAuthenticated",
     ),
+    "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
 }
 
-
-# ---------------------------------------------------------
-# JWT
-# ---------------------------------------------------------
 
 SIMPLE_JWT = {
-    "ACCESS_TOKEN_LIFETIME": timedelta(
-        minutes=30
-    ),
-
-    "REFRESH_TOKEN_LIFETIME": timedelta(
-        days=7
-    ),
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=30),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
 }
 
-
-# ---------------------------------------------------------
-# CORS
-# ---------------------------------------------------------
 
 CORS_ALLOWED_ORIGINS = [
     "http://localhost:5173",
     "http://127.0.0.1:5173",
 ]
 
-
-# ---------------------------------------------------------
-# OLLAMA
-# ---------------------------------------------------------
 
 OLLAMA_BASE_URL = os.getenv(
     "OLLAMA_BASE_URL",
@@ -255,10 +160,6 @@ OLLAMA_MODEL = os.getenv(
     "llama3.2:3b",
 )
 
-
-# ---------------------------------------------------------
-# CELERY + REDIS
-# ---------------------------------------------------------
 
 CELERY_BROKER_URL = os.getenv(
     "CELERY_BROKER_URL",
@@ -279,3 +180,11 @@ CELERY_TASK_SERIALIZER = "json"
 CELERY_RESULT_SERIALIZER = "json"
 
 CELERY_TIMEZONE = "UTC"
+
+
+SPECTACULAR_SETTINGS = {
+    "TITLE": "AI Workspace API",
+    "DESCRIPTION": "Backend API for AI Workspace",
+    "VERSION": "1.0.0",
+    "SERVE_INCLUDE_SCHEMA": False,
+}

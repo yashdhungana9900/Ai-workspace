@@ -499,3 +499,23 @@ export async function deleteDocument(
     accessToken
   );
 }
+
+
+export async function getDocuments(accessToken) {
+  const response = await fetch(
+    `${API_BASE_URL}/documents/`,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(
+      "Failed to load documents."
+    );
+  }
+
+  return response.json();
+}

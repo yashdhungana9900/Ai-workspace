@@ -17,7 +17,10 @@ import {
   useState,
 } from "react";
 
-import { uploadDocument } from "../../api";
+import {
+  getDocuments,
+  uploadDocument,
+} from "../../api";
 
 
 function ChatWorkspace({
@@ -38,6 +41,15 @@ function ChatWorkspace({
 
   const [isUploading, setIsUploading] =
     useState(false);
+
+  const [isProcessingDocument, setIsProcessingDocument] =
+    useState(false);
+
+  const [processingDocumentId, setProcessingDocumentId] =
+    useState(null);
+
+  const [processingDocumentName, setProcessingDocumentName] =
+    useState("");
 
   const [uploadError, setUploadError] =
     useState("");
@@ -92,6 +104,7 @@ function ChatWorkspace({
       if (
         !isSending &&
         !isUploading &&
+        !isProcessingDocument &&
         input.trim()
       ) {
         onSendMessage();
@@ -101,7 +114,10 @@ function ChatWorkspace({
 
 
   const handleAttachClick = () => {
-    if (isUploading) {
+    if (
+      isUploading ||
+      isProcessingDocument
+    ) {
       return;
     }
 
@@ -131,6 +147,108 @@ function ChatWorkspace({
     setUploadSuccess("");
     setSelectedFile(file);
   };
+
+
+  /*
+   * Poll Celery document processing status.
+   *
+   * The upload API returns quickly after the
+   * Document is created and the Celery task is queued.
+   *
+   * We then check GET /documents/ every 2 seconds
+   * until the document becomes READY or FAILED.
+   */
+  useEffect(() => {
+    if (
+      !accessToken ||
+      !processingDocumentId
+    ) {
+      return;
+    }
+
+    let cancelled = false;
+
+    const checkDocumentStatus = async () => {
+      try {
+        const documents =
+          await getDocuments(
+            accessToken
+          );
+
+        if (cancelled) {
+          return;
+        }
+
+        const document =
+          documents.find(
+            (item) =>
+              String(item.id) ===
+              String(processingDocumentId)
+          );
+
+        if (!document) {
+          return;
+        }
+
+        console.log(
+          "Document processing status:",
+          document.status
+        );
+
+        if (
+          document.status === "ready"
+        ) {
+          setIsProcessingDocument(false);
+          setProcessingDocumentId(null);
+
+          setUploadSuccess(
+            `${processingDocumentName || document.name} is ready.`
+          );
+
+          return;
+        }
+
+        if (
+          document.status === "failed"
+        ) {
+          setIsProcessingDocument(false);
+          setProcessingDocumentId(null);
+
+          setUploadError(
+            document.error_message ||
+              "Document processing failed."
+          );
+
+          setUploadSuccess("");
+
+          return;
+        }
+      } catch (error) {
+        console.error(
+          "DOCUMENT STATUS ERROR:",
+          error
+        );
+      }
+    };
+
+
+    checkDocumentStatus();
+
+    const intervalId =
+      setInterval(
+        checkDocumentStatus,
+        2000
+      );
+
+    return () => {
+      cancelled = true;
+      clearInterval(intervalId);
+    };
+  }, [
+    accessToken,
+    processingDocumentId,
+    processingDocumentName,
+  ]);
 
 
   const handleUpload = async () => {
@@ -167,8 +285,23 @@ function ChatWorkspace({
         result
       );
 
+      /*
+       * The API now queues the Celery task.
+       * Processing continues in the background.
+       */
+      setProcessingDocumentId(
+        result.id
+      );
+
+      setProcessingDocumentName(
+        result.name ||
+          selectedFile.name
+      );
+
+      setIsProcessingDocument(true);
+
       setUploadSuccess(
-        `${selectedFile.name} uploaded successfully.`
+        `${selectedFile.name} uploaded. Processing started...`
       );
 
       setSelectedFile(null);
@@ -195,6 +328,10 @@ function ChatWorkspace({
 
 
   const handleCancelUpload = () => {
+    if (isProcessingDocument) {
+      return;
+    }
+
     setSelectedFile(null);
     setUploadError("");
     setUploadSuccess("");
@@ -219,6 +356,11 @@ function ChatWorkspace({
 
   const hasMessages =
     messages.length > 0;
+
+
+  const documentBusy =
+    isUploading ||
+    isProcessingDocument;
 
 
   return (
@@ -517,6 +659,7 @@ function ChatWorkspace({
               <FileText size={18} />
 
               <div>
+
                 <strong>
                   {selectedFile.name}
                 </strong>
@@ -527,12 +670,14 @@ function ChatWorkspace({
                     1024
                   ).toFixed(1)} KB
                 </span>
+
               </div>
 
             </div>
 
 
-            {!isUploading && (
+            {!isUploading &&
+              !isProcessingDocument && (
               <button
                 type="button"
                 className="upload-cancel"
@@ -563,7 +708,9 @@ function ChatWorkspace({
         )}
 
 
-        {selectedFile && !isUploading && (
+        {selectedFile &&
+          !isUploading &&
+          !isProcessingDocument && (
           <button
             type="button"
             className="upload-document-button"
@@ -578,7 +725,19 @@ function ChatWorkspace({
 
         {isUploading && (
           <div className="upload-status">
-            Processing document...
+            Uploading document...
+          </div>
+        )}
+
+
+        {isProcessingDocument && (
+          <div className="upload-status">
+            Processing{" "}
+            {processingDocumentName
+              ? `"${processingDocumentName}"`
+              : "document"}
+            {" "}· extracting text, creating
+            chunks, and generating embeddings...
           </div>
         )}
 
@@ -591,7 +750,7 @@ function ChatWorkspace({
               className="composer-icon"
               aria-label="Attach file"
               onClick={handleAttachClick}
-              disabled={isUploading}
+              disabled={documentBusy}
               type="button"
             >
               <Paperclip size={18} />
@@ -612,7 +771,7 @@ function ChatWorkspace({
             <textarea
               className="composer-input"
               placeholder={
-                isUploading
+                documentBusy
                   ? "Processing document..."
                   : "Message AI Workspace..."
               }
@@ -626,7 +785,7 @@ function ChatWorkspace({
               rows={1}
               disabled={
                 isSending ||
-                isUploading
+                documentBusy
               }
             />
 
@@ -635,7 +794,7 @@ function ChatWorkspace({
               className={`send-button ${
                 !input.trim() ||
                 isSending ||
-                isUploading
+                documentBusy
                   ? "disabled"
                   : ""
               }`}
@@ -644,7 +803,7 @@ function ChatWorkspace({
               disabled={
                 !input.trim() ||
                 isSending ||
-                isUploading
+                documentBusy
               }
               type="button"
             >
@@ -664,15 +823,14 @@ function ChatWorkspace({
               <button
                 className="composer-tool"
                 onClick={handleAttachClick}
-                disabled={isUploading}
+                disabled={documentBusy}
                 type="button"
               >
                 <Paperclip size={14} />
 
-                {isUploading
+                {documentBusy
                   ? "Processing..."
                   : "Attach"}
-
               </button>
 
 
